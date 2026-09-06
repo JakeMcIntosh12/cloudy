@@ -624,7 +624,7 @@ export default function CustomVideoPlayer({
 
         {/* =================================================
             CENTER PLAY BUTTON
-        ================================================= */}
+        ================================================= 
 
         <button
           type="button"
@@ -643,7 +643,7 @@ export default function CustomVideoPlayer({
           ) : (
             <Play className="w-6 h-6 md:w-7 md:h-7 ml-0.5" fill="currentColor" />
           )}
-        </button>
+        </button>*/}
 
         {/* =================================================
             BOTTOM GRADIENT
