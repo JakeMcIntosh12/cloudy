@@ -39,7 +39,7 @@ function ClientsSection() {
     {
       name: "TBC",
       src: Client4Logo,
-      logoClass: "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+      logoClass: "w-[clamp(9rem,13vw,14rem)] h-[clamp(5rem,8vw,8rem)]",
     },
     {
       name: "4Life Constructions",
@@ -50,7 +50,7 @@ function ClientsSection() {
       name: "NB",
       src: Client6Logo,
       logoClass:
-        "w-[clamp(9rem,14vw,15rem)] h-[clamp(5rem,8vw,8rem)] scale-[1.35]",
+        "w-[clamp(11rem,16vw,16rem)] h-[clamp(7rem,10vw,11rem)] scale-[1.35]",
     },
   ];
 

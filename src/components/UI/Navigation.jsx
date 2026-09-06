@@ -419,12 +419,13 @@ function Navigation({
           className="flex items-center space-x-2 sm:space-x-3 pointer-events-auto"
         >
           <BlurFlicker>
-            <button
+            <Link
               type="button"
+              href='/#footer'
               className="hidden md:flex bg-black hover:bg-zinc-800 transition-colors px-[clamp(16px,1vw+8px,16px)] py-0 w-[clamp(155px,12vw+70px,204px)] h-[clamp(44px,2.5vw+20px,55px)] rounded-full border border-eclipse font-mono tracking-tighter uppercase text-[clamp(0.3rem,0.63rem+0.3vw,1.25rem)] text-center items-center justify-center text-ghost-white cursor-pointer"
             >
               Check availability
-            </button>
+            </Link>
           </BlurFlicker>
 
           <button

@@ -1,116 +1,125 @@
 "use client";
 
 import React, {
-  useRef,
-  useMemo,
-  useEffect,
+useRef,
+useMemo,
+useEffect,
 } from "react";
 
 import {
-  Canvas,
-  useThree,
-  useFrame,
+Canvas,
+useThree,
+useFrame,
 } from "@react-three/fiber";
 
 import * as THREE from "three";
 
-
 const FilmGrainShader = {
-  uniforms: {
-    uTime: { value: 0 },
-    uResolution: {
-      value: new THREE.Vector2(1, 1),
-    },
-    uIntensity: {
-      value: 0.08,
-    },
-  },
+uniforms: {
+uTime: { value: 0 },
 
-  vertexShader: `
-    varying vec2 vUv;
 
-    void main() {
-      vUv = uv;
+uResolution: {
+  value: new THREE.Vector2(1, 1),
+},
 
-      gl_Position = vec4(
-        position,
-        1.0
-      );
-    }
-  `,
+uIntensity: {
+  value: 0.08,
+},
 
-  fragmentShader: `
-    uniform float uTime;
-    uniform vec2 uResolution;
-    uniform float uIntensity;
 
-    varying vec2 vUv;
+},
 
-    float hash(vec2 p) {
-      return fract(
-        sin(
-          dot(
-            p,
-            vec2(
-              12.9898,
-              78.233
-            )
-          )
+vertexShader: `
+varying vec2 vUv;
+
+
+void main() {
+  vUv = uv;
+
+  gl_Position = vec4(
+    position,
+    1.0
+  );
+}
+
+
+`,
+
+fragmentShader: `
+uniform float uTime;
+uniform vec2 uResolution;
+uniform float uIntensity;
+
+
+varying vec2 vUv;
+
+float hash(vec2 p) {
+  return fract(
+    sin(
+      dot(
+        p,
+        vec2(
+          12.9898,
+          78.233
         )
-        * 43758.5453123
-      );
-    }
+      )
+    )
+    * 43758.5453123
+  );
+}
 
-    void main() {
+void main() {
+  float grainNoise =
+    hash(
+      vUv *
+      uResolution.xy *
+      0.75
+      +
+      vec2(
+        uTime * 97.0,
+        uTime * 61.0
+      )
+    );
 
-      float grainNoise =
-        hash(
-          vUv *
-          uResolution.xy *
-          0.75
-          +
-          vec2(
-            uTime * 97.0,
-            uTime * 61.0
-          )
-        );
+  float grainCoarse =
+    hash(
+      floor(
+        vUv *
+        uResolution.xy *
+        0.18
+      )
+      +
+      vec2(
+        uTime * 43.0,
+        uTime * 29.0
+      )
+    );
 
-      float grainCoarse =
-        hash(
-          floor(
-            vUv *
-            uResolution.xy *
-            0.18
-          )
-          +
-          vec2(
-            uTime * 43.0,
-            uTime * 29.0
-          )
-        );
+  float grain =
+    (grainNoise - 0.5)
+    *
+    0.7
+    +
+    (grainCoarse - 0.5)
+    *
+    0.3;
 
-      float grain =
-        (grainNoise - 0.5)
-        *
-        0.7
-        +
-        (grainCoarse - 0.5)
-        *
-        0.3;
+  float value =
+    0.5
+    +
+    grain *
+    uIntensity;
 
-      float value =
-        0.5
-        +
-        grain *
-        uIntensity;
+  gl_FragColor =
+    vec4(
+      vec3(value),
+      1.0
+    );
+}
 
-      gl_FragColor =
-        vec4(
-          vec3(value),
-          1.0
-        );
-    }
-  `,
+
+`,
 };
 
 // =========================================================
@@ -118,86 +127,100 @@ const FilmGrainShader = {
 // =========================================================
 
 function GrainPlane({ intensity }) {
-  const materialRef = useRef(null);
+const materialRef = useRef(null);
 
-  const { size } = useThree();
+const { size } = useThree();
 
-  /*
-    Clone uniforms once on mount.
-  */
+/*
+Clone uniforms once on mount.
+*/
 
-  const shaderArgs = useMemo(() => {
-    return {
-      uniforms:
-        THREE.UniformsUtils.clone(
-          FilmGrainShader.uniforms
-        ),
+const shaderArgs = useMemo(() => {
+return {
+uniforms:
+THREE.UniformsUtils.clone(
+FilmGrainShader.uniforms
+),
 
-      vertexShader:
-        FilmGrainShader.vertexShader,
 
-      fragmentShader:
-        FilmGrainShader.fragmentShader,
-    };
-  }, []);
+  vertexShader:
+    FilmGrainShader.vertexShader,
 
-  /*
-    Keep resolution synced with the canvas.
-  */
+  fragmentShader:
+    FilmGrainShader.fragmentShader,
+};
 
-  useEffect(() => {
-    if (!materialRef.current) return;
 
-    materialRef.current.uniforms
-      .uResolution.value.set(
-        size.width,
-        size.height
-      );
-  }, [
+}, []);
+
+/*
+Keep resolution synced with the canvas.
+*/
+
+useEffect(() => {
+if (!materialRef.current) return;
+
+
+materialRef.current.uniforms
+  .uResolution.value.set(
     size.width,
-    size.height,
-  ]);
-
-  /*
-    Keep intensity synced.
-  */
-
-  useEffect(() => {
-    if (!materialRef.current) return;
-
-    materialRef.current.uniforms
-      .uIntensity.value = intensity;
-  }, [intensity]);
-
-  /*
-    Animate grain without React state.
-  */
-
-  useFrame((_, delta) => {
-    if (!materialRef.current) return;
-
-    materialRef.current.uniforms
-      .uTime.value += delta;
-  });
-
-  return (
-    <mesh
-      frustumCulled={false}
-      renderOrder={9999}
-    >
-      <planeGeometry
-        args={[2, 2]}
-      />
-
-      <shaderMaterial
-        ref={materialRef}
-        args={[shaderArgs]}
-        depthTest={false}
-        depthWrite={false}
-        transparent={false}
-      />
-    </mesh>
+    size.height
   );
+
+
+}, [
+size.width,
+size.height,
+]);
+
+/*
+Keep intensity synced.
+*/
+
+useEffect(() => {
+if (!materialRef.current) return;
+
+
+materialRef.current.uniforms
+  .uIntensity.value = intensity;
+
+
+}, [intensity]);
+
+/*
+Animate grain without React state.
+*/
+
+useFrame((_, delta) => {
+if (!materialRef.current) return;
+
+
+materialRef.current.uniforms
+  .uTime.value += delta;
+
+
+});
+
+return ( <mesh
+   frustumCulled={false}
+   renderOrder={9999}
+ >
+<planeGeometry
+args={[2, 2]}
+/>
+
+```
+  <shaderMaterial
+    ref={materialRef}
+    args={[shaderArgs]}
+    depthTest={false}
+    depthWrite={false}
+    transparent={false}
+  />
+</mesh>
+
+
+);
 }
 
 // =========================================================
@@ -205,177 +228,133 @@ function GrainPlane({ intensity }) {
 // =========================================================
 
 export default function FilmGrain({
-  intensity = 0.08,
-  blendMode = "overlay",
-  disabled = false,
-  className = "",
-  style = {},
+intensity = 0.08,
+blendMode = "overlay",
+disabled = false,
+className = "",
+style = {},
 }) {
-  if (disabled) {
-    return null;
-  }
+if (disabled) {
+return null;
+}
 
-  return (
-    <div
-      aria-hidden="true"
-      className={className}
-      style={{
-        /*
-          ---------------------------------------------------
-          MOBILE VIEWPORT STABILIZATION
-          ---------------------------------------------------
-        */
+return (
+<div
+aria-hidden="true"
+className={className}
+style={{
+/*
+---------------------------------------------------
+FULL VIEWPORT OVERLAY
+---------------------------------------------------
+*/
 
-        position: "fixed",
 
-        left: 0,
-        top: 0,
+    position: "fixed",
+    inset: 0,
 
-        width: "100vw",
+    width: "100%",
+    height: "100%",
+    minHeight: "100dvh",
 
-        /*
-          100vh fallback
-          100dvh follows the dynamic mobile viewport.
-        */
+    /*
+      Keep the grain independent from page layout.
+    */
 
-        height: "100vh",
-        height: "100dvh",
+    overflow: "hidden",
 
-        /*
-          Prevent the browser from treating the layer
-          like normal page content.
-        */
+    /*
+      Never intercept interaction.
+    */
 
-        overflow: "hidden",
+    pointerEvents: "none",
 
-        pointerEvents: "none",
+    /*
+      Keep grain above everything else.
+    */
 
-        /*
-          Keep grain above everything else.
-        */
+    zIndex: 9999,
 
-        zIndex: 9999,
+    /*
+      Preserve existing blend mode.
+    */
 
-        /*
-          Preserve existing blend mode.
-        */
+    mixBlendMode: blendMode,
 
-        mixBlendMode: blendMode,
+    /*
+      IMPORTANT:
+      Do NOT force translate3d/translateZ here.
 
-        /*
-          Force a stable compositor layer.
-        */
+      Mobile browsers can turn a transformed fixed
+      WebGL element into a separate compositor surface,
+      which can visually detach during scrolling.
+    */
 
-        transform:
-          "translate3d(0, 0, 0)",
+    /*
+      Do NOT isolate this layer.
 
-        backfaceVisibility:
-          "hidden",
+      mix-blend-mode needs to composite naturally
+      with the content underneath it.
+    */
 
-        WebkitBackfaceVisibility:
-          "hidden",
+    touchAction: "none",
 
-        /*
-          Isolate the grain from surrounding
-          stacking/compositing contexts.
-        */
+    /*
+      Preserve anything passed into the component.
+    */
 
-        isolation: "isolate",
+    ...style,
+  }}
+>
+  <Canvas
+    gl={{
+      powerPreference:
+        "low-power",
 
-        /*
-          Prevent touch interaction from
-          being associated with this layer.
-        */
+      antialias: false,
 
-        touchAction: "none",
+      alpha: false,
 
-        /*
-          Preserve anything passed into the
-          component by the existing implementation.
-        */
+      stencil: false,
 
-        ...style,
-      }}
-    >
-      <Canvas
-        gl={{
-          powerPreference:
-            "low-power",
+      depth: false,
 
-          antialias: false,
+      precision: "lowp",
 
-          alpha: false,
+      preserveDrawingBuffer:
+        false,
+    }}
 
-          stencil: false,
+    dpr={[1, 1]}
 
-          depth: false,
+    frameloop="always"
 
-          precision: "lowp",
+    events={() => ({
+      enabled: false,
+    })}
 
-          preserveDrawingBuffer:
-            false,
-        }}
+    camera={{
+      position: [0, 0, 1],
+    }}
 
-        dpr={[1, 1]}
+    style={{
+      position: "absolute",
+      inset: 0,
 
-        frameloop="always"
+      width: "100%",
+      height: "100%",
 
-        events={() => ({
-          enabled: false,
-        })}
+      display: "block",
 
-        camera={{
-          position: [0, 0, 1],
-        }}
+      pointerEvents: "none",
+    }}
+  >
+    <GrainPlane
+      intensity={intensity}
+    />
+  </Canvas>
+</div>
 
-        style={{
-          position: "absolute",
 
-          left: 0,
-          top: 0,
-
-          width: "100%",
-          height: "100%",
-
-          display: "block",
-
-          pointerEvents: "none",
-
-          /*
-            Stabilize WebGL compositor layer.
-          */
-
-          transform:
-            "translate3d(0, 0, 0)",
-
-          backfaceVisibility:
-            "hidden",
-
-          WebkitBackfaceVisibility:
-            "hidden",
-        }}
-
-        onCreated={({ gl }) => {
-          gl.domElement.style.pointerEvents =
-            "none";
-
-          gl.domElement.style.display =
-            "block";
-
-          gl.domElement.style.transform =
-            "translate3d(0, 0, 0)";
-
-          gl.domElement.style.backfaceVisibility =
-            "hidden";
-
-          gl.domElement.style.webkitBackfaceVisibility =
-            "hidden";
-        }}
-      >
-        <GrainPlane
-          intensity={intensity}
-        />
-      </Canvas>
-    </div>
-  );
+);
 }

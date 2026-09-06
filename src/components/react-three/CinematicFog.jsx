@@ -27,6 +27,7 @@ function useIsClient() {
 class WebGLSceneErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
+
     this.state = {
       hasError: false,
     };
@@ -129,11 +130,23 @@ function RadialVaporRing() {
       { passive: true }
     );
 
-    return () =>
+    window.addEventListener(
+      "orientationchange",
+      updateDocHeight,
+      { passive: true }
+    );
+
+    return () => {
       window.removeEventListener(
         "resize",
         updateDocHeight
       );
+
+      window.removeEventListener(
+        "orientationchange",
+        updateDocHeight
+      );
+    };
   }, []);
 
   useFrame((state, delta) => {
@@ -156,18 +169,20 @@ function RadialVaporRing() {
       (scrollState.target - smoothScroll.current) *
       Math.min(1, delta * 15);
 
-    scrollState.current = smoothScroll.current;
+    scrollState.current =
+      smoothScroll.current;
 
     /* =======================================================
        DOCUMENT PROGRESS
     ======================================================= */
 
-    const progress = THREE.MathUtils.clamp(
-      scrollState.current /
-        docHeightRef.current,
-      0,
-      1
-    );
+    const progress =
+      THREE.MathUtils.clamp(
+        scrollState.current /
+          docHeightRef.current,
+        0,
+        1
+      );
 
     /* =======================================================
        CONTROLLED CLOUD PULL
@@ -360,23 +375,18 @@ export default function GlobalCinematicFog() {
 
   return (
     <div
-      className="fixed left-0 top-0 w-screen h-screen pointer-events-none z-40 overflow-hidden"
+      className="
+        fixed
+        inset-0
+        pointer-events-none
+        z-40
+        overflow-hidden
+      "
       style={{
-        width: "100vw",
-        height: "100vh",
-        height: "100dvh",
+        width: "100%",
+        height: "100%",
+        minHeight: "100dvh",
         pointerEvents: "none",
-
-        /* Prevent mobile browser compositing from
-           visually separating the WebGL layer */
-        transform: "translateZ(0)",
-        backfaceVisibility: "hidden",
-        WebkitBackfaceVisibility: "hidden",
-
-        /* Keep the layer isolated */
-        isolation: "isolate",
-
-        /* Prevent accidental touch interaction */
         touchAction: "none",
       }}
     >
@@ -400,10 +410,6 @@ export default function GlobalCinematicFog() {
             width: "100%",
             height: "100%",
             pointerEvents: "none",
-
-            transform: "translateZ(0)",
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
           }}
           events={() => ({
             enabled: false,
