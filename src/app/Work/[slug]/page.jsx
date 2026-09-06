@@ -79,16 +79,21 @@ const PROJECT_QUERY = `
       name,
       role
     },
-
     heroVideos[]{
       _key,
-      "src": select(
-        sourceType == "cloudinary" => url,
-        sourceType == "sanity" => video.asset->url,
-        null
+      sourceType,
+      url,
+      video{
+        asset->{
+          _id,
+          url
+        }
+      },
+      "src": coalesce(
+        url,
+        video.asset->url
       )
     },
-
     gallery[]{
       _key,
       "src": asset->url,
@@ -462,40 +467,29 @@ export default function CloudhausWorkDetail() {
 
   // =======================================================
   // HERO VIDEOS
-  //
-  // Sanity normalizes both supported sources into:
-  //
-  // {
-  //   sourceType: "sanity" | "cloudinary",
-  //   src: "https://..."
-  // }
-  //
-  // No Vimeo API request is required.
   // =======================================================
 
   const heroVideos = useMemo(() => {
-    if (
-      !Array.isArray(
-        project?.heroVideos
-      )
-    ) {
-      return [];
-    }
+  if (!Array.isArray(project?.heroVideos)) {
+    return [];
+  }
 
-    return project.heroVideos
-      .filter(
-        (video) =>
-          typeof video?.src === "string" &&
-          video.src.trim().length > 0
-      )
-      .map((video) => ({
-        ...video,
-        src: video.src.trim(),
-      }));
-  }, [project]);
+  return project.heroVideos
+    .map((video) => ({
+      ...video,
+      src:
+        typeof video?.src === "string"
+          ? video.src.trim()
+          : null,
+    }))
+    .filter(
+      (video) =>
+        typeof video.src === "string" &&
+        video.src.length > 0
+    );
+}, [project]);
 
-  const totalVideos =
-    heroVideos.length;
+  const totalVideos = heroVideos.length;
 
   // =======================================================
   // ACTIVE VIDEO

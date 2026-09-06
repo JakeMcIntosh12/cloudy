@@ -47,27 +47,111 @@ const WORKS_QUERY = groq`
 
     heroVideos[]{
       _key,
-      "src": select(
-        sourceType == "cloudinary" => url,
-        sourceType == "sanity" => video.asset->url,
-        null
+      sourceType,
+      url,
+
+      "sanityUrl": video.asset->url,
+
+      "src": coalesce(
+        select(
+          sourceType == "cloudinary" => url,
+          sourceType == "sanity" => video.asset->url,
+          null
+        ),
+        video.asset->url,
+        url
       )
     },
   }
 `;
 
 // ----------------------------------------------------------------------
+// HERO VIDEO URL RESOLVER
+// ----------------------------------------------------------------------
+// IMPORTANT:
+// Do not assume heroVideos[0] is the usable video.
+//
+// A project can contain multiple heroVideos entries and one of them
+// may be empty/misconfigured while another one contains the actual video.
+//
+// This helper searches through every heroVideos entry and returns the
+// first valid URL it can find.
+
+function getHeroVideoUrl(project) {
+  const videos = Array.isArray(
+    project?.heroVideos
+  )
+    ? project.heroVideos
+    : [];
+
+  const validVideo = videos.find(
+    (item) => {
+      const src =
+        typeof item?.src === "string"
+          ? item.src.trim()
+          : "";
+
+      const sanityUrl =
+        typeof item?.sanityUrl === "string"
+          ? item.sanityUrl.trim()
+          : "";
+
+      const cloudinaryUrl =
+        typeof item?.url === "string"
+          ? item.url.trim()
+          : "";
+
+      return (
+        src.length > 0 ||
+        sanityUrl.length > 0 ||
+        cloudinaryUrl.length > 0
+      );
+    }
+  );
+
+  if (!validVideo) {
+    return null;
+  }
+
+  if (
+    typeof validVideo.src === "string" &&
+    validVideo.src.trim()
+  ) {
+    return validVideo.src.trim();
+  }
+
+  if (
+    typeof validVideo.sanityUrl === "string" &&
+    validVideo.sanityUrl.trim()
+  ) {
+    return validVideo.sanityUrl.trim();
+  }
+
+  if (
+    typeof validVideo.url === "string" &&
+    validVideo.url.trim()
+  ) {
+    return validVideo.url.trim();
+  }
+
+  return null;
+}
+
+// ----------------------------------------------------------------------
+// CLOUDINARY DETECTION
+// ----------------------------------------------------------------------
+
+function isCloudinaryUrl(url) {
+  return (
+    typeof url === "string" &&
+    url.includes("res.cloudinary.com") &&
+    url.includes("/upload/")
+  );
+}
+
+// ----------------------------------------------------------------------
 // CLOUDINARY VIDEO OPTIMIZATION HELPERS
 // ----------------------------------------------------------------------
-// Injects Cloudinary transformation params into the /upload/ segment of
-// the URL so we transcode/compress/resize on the fly instead of shipping
-// the raw uploaded master file. Falls back to the original URL if it
-// isn't a Cloudinary /upload/ URL (e.g. a plain external url field).
-//
-// A bitrate cap (br_) is included alongside q_auto/vc_auto because the
-// auto-quality setting alone still allows fairly high bitrates on busy
-// footage. Capping it keeps payload size predictable at these small
-// preview render sizes without a visible quality hit.
 
 function getBitrateForWidth(width) {
   if (width <= 640) return "800k";
@@ -75,12 +159,16 @@ function getBitrateForWidth(width) {
   return "2000k";
 }
 
-function getOptimizedVideoUrl(url, { width = 960 } = {}) {
-  if (!url || typeof url !== "string" || !url.includes("/upload/")) {
+function getOptimizedVideoUrl(
+  url,
+  { width = 960 } = {}
+) {
+  if (!isCloudinaryUrl(url)) {
     return url;
   }
 
-  const bitrate = getBitrateForWidth(width);
+  const bitrate =
+    getBitrateForWidth(width);
 
   return url.replace(
     "/upload/",
@@ -88,18 +176,23 @@ function getOptimizedVideoUrl(url, { width = 960 } = {}) {
   );
 }
 
-function getVideoPosterUrl(url, { width = 960 } = {}) {
-  if (!url || typeof url !== "string" || !url.includes("/upload/")) {
+function getVideoPosterUrl(
+  url,
+  { width = 960 } = {}
+) {
+  if (!isCloudinaryUrl(url)) {
     return null;
   }
 
-  // Grabs a frame ~1s in, converts to a jpg, resizes it down.
   return url
     .replace(
       "/upload/",
       `/upload/q_auto,f_jpg,w_${width},so_1/`
     )
-    .replace(/\.\w+($|\?)/, ".jpg$1");
+    .replace(
+      /\.\w+($|\?)/,
+      ".jpg$1"
+    );
 }
 
 function getCloudinaryOrigin(url) {
@@ -117,79 +210,114 @@ function getCloudinaryOrigin(url) {
 // --------------------------------------------------------------------
 // CONNECTION WARM-UP
 // --------------------------------------------------------------------
-// Opens the DNS + TLS + TCP connection to the Cloudinary origin as soon
-// as we know it (right after the Sanity fetch resolves), instead of
-// waiting for the first <video> tag to trigger it. This shaves the
-// handshake time off of however many hundred milliseconds it takes the
-// first hero video to actually start downloading.
-//
-// Two preconnect hints are added (with and without crossorigin) since
-// whether the browser treats the eventual video fetch as CORS or not
-// can vary, and mismatching it means the preconnect is wasted.
 
 function useCloudinaryPreconnect(url) {
   useEffect(() => {
-    const origin = getCloudinaryOrigin(url);
+    const origin =
+      getCloudinaryOrigin(url);
 
-    if (!origin || typeof document === "undefined") {
+    if (
+      !origin ||
+      typeof document === "undefined"
+    ) {
       return;
     }
 
     const marker = `link[data-cloudinary-preconnect="${origin}"]`;
 
-    if (document.head.querySelector(marker)) {
+    if (
+      document.head.querySelector(marker)
+    ) {
       return;
     }
 
     const links = [];
 
-    const preconnect = document.createElement("link");
+    const preconnect =
+      document.createElement("link");
+
     preconnect.rel = "preconnect";
     preconnect.href = origin;
-    preconnect.setAttribute("data-cloudinary-preconnect", origin);
+
+    preconnect.setAttribute(
+      "data-cloudinary-preconnect",
+      origin
+    );
+
     links.push(preconnect);
 
-    const preconnectCors = document.createElement("link");
+    const preconnectCors =
+      document.createElement("link");
+
     preconnectCors.rel = "preconnect";
     preconnectCors.href = origin;
-    preconnectCors.crossOrigin = "anonymous";
-    preconnectCors.setAttribute("data-cloudinary-preconnect", origin);
+    preconnectCors.crossOrigin =
+      "anonymous";
+
+    preconnectCors.setAttribute(
+      "data-cloudinary-preconnect",
+      origin
+    );
+
     links.push(preconnectCors);
 
-    const dnsPrefetch = document.createElement("link");
+    const dnsPrefetch =
+      document.createElement("link");
+
     dnsPrefetch.rel = "dns-prefetch";
     dnsPrefetch.href = origin;
-    dnsPrefetch.setAttribute("data-cloudinary-preconnect", origin);
+
+    dnsPrefetch.setAttribute(
+      "data-cloudinary-preconnect",
+      origin
+    );
+
     links.push(dnsPrefetch);
 
-    links.forEach((link) => document.head.appendChild(link));
+    links.forEach((link) =>
+      document.head.appendChild(link)
+    );
   }, [url]);
 }
 
-// --------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // VIEWPORT-AWARE VIDEO WIDTH
-// --------------------------------------------------------------------
-// Mobile connections and mobile-sized render targets don't need the
-// same 960px source the desktop grid uses. This trims payload size for
-// the majority-mobile traffic pattern most of these sites see.
+// ----------------------------------------------------------------------
 
 function useIsMobileViewport() {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] =
+    useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) {
+    if (
+      typeof window === "undefined" ||
+      !window.matchMedia
+    ) {
       return;
     }
 
-    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const mediaQuery =
+      window.matchMedia(
+        "(max-width: 768px)"
+      );
 
-    const update = () => setIsMobile(mediaQuery.matches);
+    const update = () =>
+      setIsMobile(
+        mediaQuery.matches
+      );
 
     update();
 
-    mediaQuery.addEventListener("change", update);
+    mediaQuery.addEventListener(
+      "change",
+      update
+    );
 
-    return () => mediaQuery.removeEventListener("change", update);
+    return () =>
+      mediaQuery.removeEventListener(
+        "change",
+        update
+      );
   }, []);
 
   return isMobile;
@@ -272,8 +400,11 @@ const noiseShaderDefinition = {
 // SHARED TV NOISE PLANE
 // ----------------------------------------------------------------------
 
-function TVNoisePlane({ opacityRef }) {
-  const materialRef = useRef(null);
+function TVNoisePlane({
+  opacityRef,
+}) {
+  const materialRef =
+    useRef(null);
 
   const shaderArgs = useMemo(() => {
     return {
@@ -295,12 +426,17 @@ function TVNoisePlane({ opacityRef }) {
   }, []);
 
   useFrame((_, delta) => {
-    if (!materialRef.current) return;
+    if (!materialRef.current) {
+      return;
+    }
 
     materialRef.current.uniforms.uTime.value +=
       delta;
 
-    if (opacityRef.current !== undefined) {
+    if (
+      opacityRef.current !==
+      undefined
+    ) {
       materialRef.current.uniforms.uOpacity.value =
         opacityRef.current.value;
     }
@@ -308,7 +444,9 @@ function TVNoisePlane({ opacityRef }) {
 
   return (
     <mesh>
-      <planeGeometry args={[2, 2]} />
+      <planeGeometry
+        args={[2, 2]}
+      />
 
       <shaderMaterial
         ref={materialRef}
@@ -327,72 +465,94 @@ function TVNoisePlane({ opacityRef }) {
 
 const SharedTVNoise = forwardRef(
   function SharedTVNoise(_, ref) {
-    const opacityRef = useRef({
-      value: 0,
-    });
+    const opacityRef =
+      useRef({
+        value: 0,
+      });
 
-    const targetRef = useRef(null);
-    const containerRef = useRef(null);
+    const targetRef =
+      useRef(null);
 
-    const updatePosition = useCallback(() => {
-      const target = targetRef.current;
-      const container = containerRef.current;
+    const containerRef =
+      useRef(null);
 
-      if (!target || !container) {
-        if (container) {
-          container.style.opacity = "0";
+    const updatePosition =
+      useCallback(() => {
+        const target =
+          targetRef.current;
+
+        const container =
+          containerRef.current;
+
+        if (
+          !target ||
+          !container
+        ) {
+          if (container) {
+            container.style.opacity =
+              "0";
+          }
+
+          return;
         }
 
-        return;
-      }
+        const rect =
+          target.getBoundingClientRect();
 
-      const rect =
-        target.getBoundingClientRect();
+        if (
+          rect.width <= 0 ||
+          rect.height <= 0
+        ) {
+          container.style.opacity =
+            "0";
 
-      if (
-        rect.width <= 0 ||
-        rect.height <= 0
-      ) {
-        container.style.opacity = "0";
-        return;
-      }
+          return;
+        }
 
-      container.style.left =
-        `${rect.left}px`;
+        container.style.left =
+          `${rect.left}px`;
 
-      container.style.top =
-        `${rect.top}px`;
+        container.style.top =
+          `${rect.top}px`;
 
-      container.style.width =
-        `${rect.width}px`;
+        container.style.width =
+          `${rect.width}px`;
 
-      container.style.height =
-        `${rect.height}px`;
+        container.style.height =
+          `${rect.height}px`;
 
-      container.style.opacity = "1";
-    }, []);
+        container.style.opacity =
+          "1";
+      }, []);
 
     useImperativeHandle(
       ref,
       () => ({
         setTarget: (element) => {
-          targetRef.current = element;
+          targetRef.current =
+            element;
+
           updatePosition();
         },
 
         clearTarget: () => {
           targetRef.current = null;
 
-          if (containerRef.current) {
+          if (
+            containerRef.current
+          ) {
             containerRef.current.style.opacity =
               "0";
           }
         },
 
         triggerNoise: () => {
-          const target = targetRef.current;
+          const target =
+            targetRef.current;
 
-          if (!target) return;
+          if (!target) {
+            return;
+          }
 
           updatePosition();
 
@@ -402,14 +562,20 @@ const SharedTVNoise = forwardRef(
 
           gsap
             .timeline()
-            .set(opacityRef.current, {
-              value: 0.85,
-            })
-            .to(opacityRef.current, {
-              value: 0,
-              duration: 0.32,
-              ease: "power3.out",
-            });
+            .set(
+              opacityRef.current,
+              {
+                value: 0.85,
+              }
+            )
+            .to(
+              opacityRef.current,
+              {
+                value: 0,
+                duration: 0.32,
+                ease: "power3.out",
+              }
+            );
         },
       }),
       [updatePosition]
@@ -422,14 +588,20 @@ const SharedTVNoise = forwardRef(
         updatePosition();
 
         frameId =
-          requestAnimationFrame(update);
+          requestAnimationFrame(
+            update
+          );
       };
 
       frameId =
-        requestAnimationFrame(update);
+        requestAnimationFrame(
+          update
+        );
 
       return () => {
-        cancelAnimationFrame(frameId);
+        cancelAnimationFrame(
+          frameId
+        );
 
         gsap.killTweensOf(
           opacityRef.current
@@ -463,13 +635,15 @@ const SharedTVNoise = forwardRef(
           gl={{
             alpha: true,
             antialias: false,
-            powerPreference: "low-power",
+            powerPreference:
+              "low-power",
           }}
           dpr={[1, 1]}
           frameloop="always"
           className="w-full h-full pointer-events-none"
           style={{
-            pointerEvents: "none",
+            pointerEvents:
+              "none",
           }}
         >
           <TVNoisePlane
@@ -489,36 +663,47 @@ SharedTVNoise.displayName =
 // ----------------------------------------------------------------------
 
 const SmallButton = forwardRef(
-  ({ isOpen = false }, ref) => {
-    const buttonRef = useRef(null);
+  (
+    { isOpen = false },
+    ref
+  ) => {
+    const buttonRef =
+      useRef(null);
 
-    useImperativeHandle(ref, () => ({
-      triggerBlur: () => {
-        if (!buttonRef.current) return;
-
-        gsap.killTweensOf(
-          buttonRef.current
-        );
-
-        gsap.fromTo(
-          buttonRef.current,
-          {
-            filter:
-              "blur(22px) brightness(1.5)",
-            scale: 0.92,
-            opacity: 0.5,
-          },
-          {
-            filter:
-              "blur(0px) brightness(1)",
-            scale: 1,
-            opacity: 1,
-            duration: 0.45,
-            ease: "back.out(1.7)",
+    useImperativeHandle(
+      ref,
+      () => ({
+        triggerBlur: () => {
+          if (
+            !buttonRef.current
+          ) {
+            return;
           }
-        );
-      },
-    }));
+
+          gsap.killTweensOf(
+            buttonRef.current
+          );
+
+          gsap.fromTo(
+            buttonRef.current,
+            {
+              filter:
+                "blur(22px) brightness(1.5)",
+              scale: 0.92,
+              opacity: 0.5,
+            },
+            {
+              filter:
+                "blur(0px) brightness(1)",
+              scale: 1,
+              opacity: 1,
+              duration: 0.45,
+              ease: "back.out(1.7)",
+            }
+          );
+        },
+      })
+    );
 
     return (
       <div
@@ -563,20 +748,26 @@ SmallButton.displayName =
 // HELPERS
 // ----------------------------------------------------------------------
 
-const formatTime = (seconds) => {
+const formatTime = (
+  seconds
+) => {
   if (isNaN(seconds)) {
     return "00:00";
   }
 
-  const mins = Math.floor(
-    seconds / 60
-  );
+  const mins =
+    Math.floor(
+      seconds / 60
+    );
 
-  const secs = Math.floor(
-    seconds % 60
-  );
+  const secs =
+    Math.floor(
+      seconds % 60
+    );
 
-  return `${mins < 10 ? "0" : ""}${mins}:${
+  return `${
+    mins < 10 ? "0" : ""
+  }${mins}:${
     secs < 10 ? "0" : ""
   }${secs}`;
 };
@@ -584,8 +775,6 @@ const formatTime = (seconds) => {
 // ----------------------------------------------------------------------
 // MOBILE VIDEO HEIGHT
 // ----------------------------------------------------------------------
-// Mobile only.
-// Desktop is completely unaffected by these classes.
 
 const mobileVideoHeightVariants = [
   "max-md:h-[52vw]",
@@ -594,23 +783,30 @@ const mobileVideoHeightVariants = [
   "max-md:h-[60vw]",
 ];
 
-const getMobileVideoHeight = (video) => {
-  const source =
-    video?._id ||
-    video?.slug ||
-    video?.title ||
-    "";
+const getMobileVideoHeight =
+  (video) => {
+    const source =
+      video?._id ||
+      video?.slug ||
+      video?.title ||
+      "";
 
-  let hash = 0;
+    let hash = 0;
 
-  for (let i = 0; i < source.length; i++) {
-    hash += source.charCodeAt(i);
-  }
+    for (
+      let i = 0;
+      i < source.length;
+      i++
+    ) {
+      hash +=
+        source.charCodeAt(i);
+    }
 
-  return mobileVideoHeightVariants[
-    hash % mobileVideoHeightVariants.length
-  ];
-};
+    return mobileVideoHeightVariants[
+      hash %
+        mobileVideoHeightVariants.length
+    ];
+  };
 
 // ----------------------------------------------------------------------
 // 3. WORK CARD
@@ -630,6 +826,9 @@ function WorkCard({
   const [videoUrl, setVideoUrl] =
     useState(null);
 
+  const [hasVideoError, setHasVideoError] =
+    useState(false);
+
   const containerRef =
     useRef(null);
 
@@ -639,65 +838,107 @@ function WorkCard({
   const videoRef =
     useRef(null);
 
-  const isMobile = useIsMobileViewport();
+  const isMobile =
+    useIsMobileViewport();
 
   const mobileVideoHeight =
     useMemo(
       () =>
-        getMobileVideoHeight(video),
+        getMobileVideoHeight(
+          video
+        ),
       [video]
     );
 
   // --------------------------------------------------
-  // GET CLOUDINARY VIDEO (RAW + OPTIMIZED + POSTER)
+  // RESOLVE HERO VIDEO
+  // --------------------------------------------------
+  // IMPORTANT:
+  // Searches every heroVideos entry instead of assuming [0].
+
+  const rawUrl = useMemo(
+    () =>
+      getHeroVideoUrl(video),
+    [video]
+  );
+
+  // Smaller source width on mobile.
+
+  const videoWidth =
+    isMobile
+      ? 640
+      : 960;
+
+  // Only transform Cloudinary URLs.
+
+  const optimizedVideoUrl =
+    useMemo(
+      () =>
+        getOptimizedVideoUrl(
+          rawUrl,
+          {
+            width:
+              videoWidth,
+          }
+        ),
+      [
+        rawUrl,
+        videoWidth,
+      ]
+    );
+
+  const posterUrl =
+    useMemo(
+      () =>
+        getVideoPosterUrl(
+          rawUrl,
+          {
+            width:
+              videoWidth,
+          }
+        ),
+      [
+        rawUrl,
+        videoWidth,
+      ]
+    );
+
+  // --------------------------------------------------
+  // RESET VIDEO ERROR WHEN PROJECT CHANGES
   // --------------------------------------------------
 
-  const rawUrl =
-    typeof video?.heroVideos?.[0]?.src ===
-    "string"
-      ? video.heroVideos[0].src.trim()
-      : null;
-
-  // Smaller source width on mobile viewports — less payload, faster
-  // start on the connections most likely to be bandwidth-constrained.
-  const videoWidth = isMobile ? 640 : 960;
-
-  const cloudinaryUrl = useMemo(
-    () =>
-      getOptimizedVideoUrl(rawUrl, {
-        width: videoWidth,
-      }),
-    [rawUrl, videoWidth]
-  );
-
-  const posterUrl = useMemo(
-    () =>
-      getVideoPosterUrl(rawUrl, {
-        width: videoWidth,
-      }),
-    [rawUrl, videoWidth]
-  );
+  useEffect(() => {
+    setHasVideoError(false);
+    setVideoUrl(null);
+  }, [rawUrl]);
 
   // --------------------------------------------------
   // LOAD VIDEO
   // --------------------------------------------------
 
-  const loadVideo = useCallback(
-    async () => {
-      if (!cloudinaryUrl) {
-        return null;
-      }
+  const loadVideo =
+    useCallback(
+      async () => {
+        if (!optimizedVideoUrl) {
+          return null;
+        }
 
-      if (videoUrl) {
-        return videoUrl;
-      }
+        if (videoUrl) {
+          return videoUrl;
+        }
 
-      setVideoUrl(cloudinaryUrl);
+        setHasVideoError(false);
+        setVideoUrl(
+          optimizedVideoUrl
+        );
 
-      return cloudinaryUrl;
-    },
-    [cloudinaryUrl, videoUrl]
-  );
+        return optimizedVideoUrl;
+      },
+      [
+        optimizedVideoUrl,
+        videoUrl,
+      ]
+    );
 
   // --------------------------------------------------
   // VIDEO LAZY LOADING
@@ -706,7 +947,7 @@ function WorkCard({
   useEffect(() => {
     if (
       !containerRef.current ||
-      !cloudinaryUrl
+      !optimizedVideoUrl
     ) {
       return;
     }
@@ -740,14 +981,14 @@ function WorkCard({
             entry.isIntersecting
           ) {
             loadVideo();
+
             observer.disconnect();
           }
         },
         {
-          // Loaded well ahead of it actually entering the viewport so
-          // the buffer is warm by the time the user scrolls to it.
           rootMargin:
             "600px 0px",
+
           threshold: 0,
         }
       );
@@ -758,7 +999,7 @@ function WorkCard({
       observer.disconnect();
     };
   }, [
-    cloudinaryUrl,
+    optimizedVideoUrl,
     priority,
     loadVideo,
   ]);
@@ -766,218 +1007,262 @@ function WorkCard({
   // --------------------------------------------------
   // PRIORITY VIDEO PRELOAD HINT
   // --------------------------------------------------
-  // For above-the-fold cards, drop a <link rel="preload" as="video">
-  // into <head> so the browser starts the fetch at the same time it
-  // decides to render the <video> tag, rather than only discovering
-  // the request once the element itself is parsed and mounted.
 
   useEffect(() => {
     if (
       !priority ||
-      !cloudinaryUrl ||
-      typeof document === "undefined"
+      !optimizedVideoUrl ||
+      typeof document ===
+        "undefined"
     ) {
       return;
     }
 
-    const marker = `link[data-video-preload="${cloudinaryUrl}"]`;
+    const marker = `link[data-video-preload="${optimizedVideoUrl}"]`;
 
-    if (document.head.querySelector(marker)) {
+    if (
+      document.head.querySelector(
+        marker
+      )
+    ) {
       return;
     }
 
     const preloadLink =
-      document.createElement("link");
+      document.createElement(
+        "link"
+      );
 
-    preloadLink.rel = "preload";
+    preloadLink.rel =
+      "preload";
+
     preloadLink.as = "video";
-    preloadLink.href = cloudinaryUrl;
+
+    preloadLink.href =
+      optimizedVideoUrl;
+
     preloadLink.setAttribute(
       "data-video-preload",
-      cloudinaryUrl
+      optimizedVideoUrl
     );
 
-    document.head.appendChild(preloadLink);
+    document.head.appendChild(
+      preloadLink
+    );
 
     return () => {
       preloadLink.remove();
     };
-  }, [priority, cloudinaryUrl]);
+  }, [
+    priority,
+    optimizedVideoUrl,
+  ]);
+
+  // --------------------------------------------------
+  // VIDEO ERROR FALLBACK
+  // --------------------------------------------------
+  // If a transformed Cloudinary URL fails, retry using the original
+  // URL. This does not affect Sanity URLs because they are already raw.
+
+  const handleVideoError =
+    useCallback(() => {
+      if (
+        !rawUrl ||
+        !videoUrl
+      ) {
+        return;
+      }
+
+      if (
+        videoUrl !== rawUrl
+      ) {
+        setHasVideoError(true);
+        setVideoUrl(rawUrl);
+      }
+    }, [
+      rawUrl,
+      videoUrl,
+    ]);
 
   // --------------------------------------------------
   // VIDEO METADATA
   // --------------------------------------------------
 
-  const handleLoadedMetadata = (
-    e
-  ) => {
-    const videoEl =
-      e.currentTarget;
+  const handleLoadedMetadata =
+    (e) => {
+      const videoEl =
+        e.currentTarget;
 
-    if (
-      videoEl &&
-      Number.isFinite(
-        videoEl.duration
-      ) &&
-      videoEl.duration > 0
-    ) {
-      videoEl.currentTime =
-        Math.random() *
-        videoEl.duration;
-    }
-  };
+      if (
+        videoEl &&
+        Number.isFinite(
+          videoEl.duration
+        ) &&
+        videoEl.duration > 0
+      ) {
+        videoEl.currentTime =
+          Math.random() *
+          videoEl.duration;
+      }
+    };
 
   // --------------------------------------------------
   // VIDEO TIME
   // --------------------------------------------------
 
-  const handleTimeUpdate = (
-    e
-  ) => {
-    const videoEl =
-      e.currentTarget;
+  const handleTimeUpdate =
+    (e) => {
+      const videoEl =
+        e.currentTarget;
 
-    if (videoEl) {
-      setCurrentTime(
-        formatTime(
-          videoEl.currentTime
-        )
-      );
-    }
-  };
+      if (videoEl) {
+        setCurrentTime(
+          formatTime(
+            videoEl.currentTime
+          )
+        );
+      }
+    };
 
   // --------------------------------------------------
   // HOVER ENTER
   // --------------------------------------------------
 
-  const handleMouseEnter = async () => {
-    let source =
-      videoUrl;
+  const handleMouseEnter =
+    async () => {
+      let source =
+        videoUrl;
 
-    if (!source) {
-      source =
-        await loadVideo();
-    }
+      if (!source) {
+        source =
+          await loadVideo();
+      }
 
-    onHoverChange(
-      true,
-      containerRef.current,
-      video,
-      source
-    );
-
-    if (
-      !containerRef.current
-    ) {
-      return;
-    }
-
-    const brackets =
-      containerRef.current.querySelectorAll(
-        ".corner-tl, .corner-tr, .corner-bl, .corner-br"
+      onHoverChange(
+        true,
+        containerRef.current,
+        video,
+        source
       );
 
-    gsap.to(brackets, {
-      opacity: 1,
-      scale: 1,
-      x: 0,
-      y: 0,
-      duration: 0.35,
-      ease: "power2.out",
-      overwrite: "auto",
-    });
+      if (
+        !containerRef.current
+      ) {
+        return;
+      }
 
-    if (videoRef.current) {
-      videoRef.current.pause();
-    }
+      const brackets =
+        containerRef.current.querySelectorAll(
+          ".corner-tl, .corner-tr, .corner-bl, .corner-br"
+        );
 
-    buttonRef.current?.triggerBlur?.();
-  };
+      gsap.to(brackets, {
+        opacity: 1,
+        scale: 1,
+        x: 0,
+        y: 0,
+        duration: 0.35,
+        ease: "power2.out",
+        overwrite:
+          "auto",
+      });
+
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+
+      buttonRef.current?.triggerBlur?.();
+    };
 
   // --------------------------------------------------
   // HOVER LEAVE
   // --------------------------------------------------
 
-  const handleMouseLeave = () => {
-    onHoverChange(
-      false,
-      containerRef.current,
-      video,
-      videoUrl
-    );
-
-    if (
-      !containerRef.current
-    ) {
-      return;
-    }
-
-    const topL =
-      containerRef.current.querySelector(
-        ".corner-tl"
+  const handleMouseLeave =
+    () => {
+      onHoverChange(
+        false,
+        containerRef.current,
+        video,
+        videoUrl
       );
 
-    const topR =
-      containerRef.current.querySelector(
-        ".corner-tr"
-      );
+      if (
+        !containerRef.current
+      ) {
+        return;
+      }
 
-    const botL =
-      containerRef.current.querySelector(
-        ".corner-bl"
-      );
+      const topL =
+        containerRef.current.querySelector(
+          ".corner-tl"
+        );
 
-    const botR =
-      containerRef.current.querySelector(
-        ".corner-br"
-      );
+      const topR =
+        containerRef.current.querySelector(
+          ".corner-tr"
+        );
 
-    gsap.to(topL, {
-      opacity: 0,
-      scale: 0.9,
-      x: -12,
-      y: -12,
-      duration: 0.75,
-      ease: "power4.inOut",
-      overwrite: "auto",
-    });
+      const botL =
+        containerRef.current.querySelector(
+          ".corner-bl"
+        );
 
-    gsap.to(topR, {
-      opacity: 0,
-      scale: 0.9,
-      x: 12,
-      y: -12,
-      duration: 0.75,
-      ease: "power4.inOut",
-      overwrite: "auto",
-    });
+      const botR =
+        containerRef.current.querySelector(
+          ".corner-br"
+        );
 
-    gsap.to(botL, {
-      opacity: 0,
-      scale: 0.9,
-      x: -12,
-      y: 12,
-      duration: 0.75,
-      ease: "power4.inOut",
-      overwrite: "auto",
-    });
+      gsap.to(topL, {
+        opacity: 0,
+        scale: 0.9,
+        x: -12,
+        y: -12,
+        duration: 0.75,
+        ease: "power4.inOut",
+        overwrite:
+          "auto",
+      });
 
-    gsap.to(botR, {
-      opacity: 0,
-      scale: 0.9,
-      x: 12,
-      y: 12,
-      duration: 0.75,
-      ease: "power4.inOut",
-      overwrite: "auto",
-    });
+      gsap.to(topR, {
+        opacity: 0,
+        scale: 0.9,
+        x: 12,
+        y: -12,
+        duration: 0.75,
+        ease: "power4.inOut",
+        overwrite:
+          "auto",
+      });
 
-    if (videoRef.current) {
-      videoRef.current
-        .play()
-        .catch(() => {});
-    }
-  };
+      gsap.to(botL, {
+        opacity: 0,
+        scale: 0.9,
+        x: -12,
+        y: 12,
+        duration: 0.75,
+        ease: "power4.inOut",
+        overwrite:
+          "auto",
+      });
+
+      gsap.to(botR, {
+        opacity: 0,
+        scale: 0.9,
+        x: 12,
+        y: 12,
+        duration: 0.75,
+        ease: "power4.inOut",
+        overwrite:
+          "auto",
+      });
+
+      if (videoRef.current) {
+        videoRef.current
+          .play()
+          .catch(() => {});
+      }
+    };
 
   if (!video) {
     return null;
@@ -1046,14 +1331,22 @@ function WorkCard({
           <video
             ref={videoRef}
             src={videoUrl}
-            poster={posterUrl || undefined}
+            poster={
+              posterUrl ||
+              undefined
+            }
             autoPlay
             loop
             muted
             playsInline
             preload="auto"
             fetchPriority={
-              priority ? "high" : "auto"
+              priority
+                ? "high"
+                : "auto"
+            }
+            onError={
+              handleVideoError
             }
             onLoadedMetadata={
               handleLoadedMetadata
@@ -1071,17 +1364,22 @@ function WorkCard({
             "
           />
         ) : posterUrl ? (
-          // Poster-only placeholder while the video hasn't been
-          // requested yet (still outside the lazy-load margin).
+          // Poster-only placeholder while video hasn't been requested.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={posterUrl}
             alt=""
             aria-hidden="true"
-            loading={priority ? "eager" : "lazy"}
+            loading={
+              priority
+                ? "eager"
+                : "lazy"
+            }
             decoding="async"
             fetchPriority={
-              priority ? "high" : "low"
+              priority
+                ? "high"
+                : "low"
             }
             className="
               block
@@ -1099,7 +1397,9 @@ function WorkCard({
             </span>
 
             <span className="font-geist-mono text-[9px] text-zinc-700 uppercase">
-              No hero video
+              {rawUrl
+                ? "Video unavailable"
+                : "No hero video"}
             </span>
           </div>
         )}
@@ -1168,98 +1468,113 @@ function ListItemRow({
     useRef(null);
 
   const activateRow =
-    useCallback(async () => {
-      if (!hoverEnabled) {
-        return;
-      }
+    useCallback(
+      async () => {
+        if (!hoverEnabled) {
+          return;
+        }
 
-      onHoverStart(project);
+        onHoverStart(project);
 
-      gsap.to(rowRef.current, {
-        backgroundColor: "#ffffff",
-        duration: 0.3,
-        ease: "power2.out",
-        overwrite: "auto",
-      });
+        gsap.to(rowRef.current, {
+          backgroundColor:
+            "#ffffff",
+          duration: 0.3,
+          ease: "power2.out",
+          overwrite:
+            "auto",
+        });
 
-      gsap.to(titleRef.current, {
-        x: 12,
-        color: "#000000",
-        duration: 0.35,
-        ease: "power3.out",
-        overwrite: "auto",
-      });
-
-      gsap.to(
-        subtitleRef.current,
-        {
-          x: 8,
+        gsap.to(titleRef.current, {
+          x: 12,
           color: "#000000",
           duration: 0.35,
           ease: "power3.out",
-          overwrite: "auto",
-        }
-      );
+          overwrite:
+            "auto",
+        });
 
-      gsap.to(dateRef.current, {
-        x: -8,
-        color: "#000000",
-        duration: 0.35,
-        ease: "power3.out",
-        overwrite: "auto",
-      });
-    }, [
-      hoverEnabled,
-      onHoverStart,
-      project,
-    ]);
+        gsap.to(
+          subtitleRef.current,
+          {
+            x: 8,
+            color: "#000000",
+            duration: 0.35,
+            ease: "power3.out",
+            overwrite:
+              "auto",
+          }
+        );
 
-  const deactivateRow =
-    useCallback(() => {
-      if (!hoverEnabled) {
-        return;
-      }
-
-      onHoverEnd();
-
-      gsap.to(rowRef.current, {
-        backgroundColor:
-          "transparent",
-        duration: 0.3,
-        ease: "power2.out",
-        overwrite: "auto",
-      });
-
-      gsap.to(titleRef.current, {
-        x: 0,
-        color: "#f8f8f8",
-        duration: 0.35,
-        ease: "power3.out",
-        overwrite: "auto",
-      });
-
-      gsap.to(
-        subtitleRef.current,
-        {
-          x: 0,
-          color: "#a1a1a1",
+        gsap.to(dateRef.current, {
+          x: -8,
+          color: "#000000",
           duration: 0.35,
           ease: "power3.out",
-          overwrite: "auto",
-        }
-      );
+          overwrite:
+            "auto",
+        });
+      },
+      [
+        hoverEnabled,
+        onHoverStart,
+        project,
+      ]
+    );
 
-      gsap.to(dateRef.current, {
-        x: 0,
-        color: "#71717a",
-        duration: 0.35,
-        ease: "power3.out",
-        overwrite: "auto",
-      });
-    }, [
-      hoverEnabled,
-      onHoverEnd,
-    ]);
+  const deactivateRow =
+    useCallback(
+      () => {
+        if (!hoverEnabled) {
+          return;
+        }
+
+        onHoverEnd();
+
+        gsap.to(rowRef.current, {
+          backgroundColor:
+            "transparent",
+          duration: 0.3,
+          ease: "power2.out",
+          overwrite:
+            "auto",
+        });
+
+        gsap.to(titleRef.current, {
+          x: 0,
+          color: "#f8f8f8",
+          duration: 0.35,
+          ease: "power3.out",
+          overwrite:
+            "auto",
+        });
+
+        gsap.to(
+          subtitleRef.current,
+          {
+            x: 0,
+            color: "#a1a1a1",
+            duration: 0.35,
+            ease: "power3.out",
+            overwrite:
+              "auto",
+          }
+        );
+
+        gsap.to(dateRef.current, {
+          x: 0,
+          color: "#71717a",
+          duration: 0.35,
+          ease: "power3.out",
+          overwrite:
+            "auto",
+        });
+      },
+      [
+        hoverEnabled,
+        onHoverEnd,
+      ]
+    );
 
   return (
     <div
@@ -1336,11 +1651,14 @@ function ClientFilter({
         Boolean
       );
 
-    gsap.set(optionsRef.current, {
-      width: 0,
-      opacity: 0,
-      overflow: "hidden",
-    });
+    gsap.set(
+      optionsRef.current,
+      {
+        width: 0,
+        opacity: 0,
+        overflow: "hidden",
+      }
+    );
 
     gsap.set(items, {
       opacity: 0,
@@ -1354,47 +1672,55 @@ function ClientFilter({
 
   const openFilter =
     useCallback(() => {
-      if (!clientFilters.length) {
+      if (
+        !clientFilters.length
+      ) {
         return;
       }
 
       setIsOpen(true);
 
-      requestAnimationFrame(() => {
-        if (!optionsRef.current) {
-          return;
-        }
+      requestAnimationFrame(
+        () => {
+          if (
+            !optionsRef.current
+          ) {
+            return;
+          }
 
-        const items =
-          optionItemsRef.current.filter(
-            Boolean
+          const items =
+            optionItemsRef.current.filter(
+              Boolean
+            );
+
+          gsap.killTweensOf([
+            optionsRef.current,
+            ...items,
+          ]);
+
+          gsap.to(
+            optionsRef.current,
+            {
+              width: "auto",
+              opacity: 1,
+              duration: 0.55,
+              ease: "power3.out",
+              overwrite:
+                "auto",
+            }
           );
 
-        gsap.killTweensOf([
-          optionsRef.current,
-          ...items,
-        ]);
-
-        gsap.to(
-          optionsRef.current,
-          {
-            width: "auto",
+          gsap.to(items, {
             opacity: 1,
-            duration: 0.55,
+            x: 0,
+            duration: 0.5,
+            stagger: 0.055,
             ease: "power3.out",
-            overwrite: "auto",
-          }
-        );
-
-        gsap.to(items, {
-          opacity: 1,
-          x: 0,
-          duration: 0.5,
-          stagger: 0.055,
-          ease: "power3.out",
-          overwrite: "auto",
-        });
-      });
+            overwrite:
+              "auto",
+          });
+        }
+      );
     }, [clientFilters]);
 
   // --------------------------------------------------
@@ -1403,7 +1729,9 @@ function ClientFilter({
 
   const closeFilter =
     useCallback(() => {
-      if (!optionsRef.current) {
+      if (
+        !optionsRef.current
+      ) {
         setIsOpen(false);
         return;
       }
@@ -1424,7 +1752,8 @@ function ClientFilter({
         duration: 0.35,
         stagger: 0.025,
         ease: "power3.inOut",
-        overwrite: "auto",
+        overwrite:
+          "auto",
       });
 
       gsap.to(
@@ -1435,7 +1764,8 @@ function ClientFilter({
           duration: 0.5,
           delay: 0.04,
           ease: "power3.inOut",
-          overwrite: "auto",
+          overwrite:
+            "auto",
           onComplete: () => {
             setIsOpen(false);
           },
@@ -1512,7 +1842,8 @@ function ClientFilter({
         className="flex items-center overflow-hidden whitespace-nowrap"
         style={{
           gap: "0.75rem",
-          marginLeft: "0.75rem",
+          marginLeft:
+            "0.75rem",
         }}
       >
         <button
@@ -1554,7 +1885,8 @@ function ClientFilter({
               <span
                 ref={(el) => {
                   optionItemsRef.current[
-                    index * 2 + 1
+                    index * 2 +
+                      1
                   ] = el;
                 }}
                 className="text-zinc-800 font-geist-mono text-[0.65rem] md:text-xs"
@@ -1565,7 +1897,8 @@ function ClientFilter({
               <button
                 ref={(el) => {
                   optionItemsRef.current[
-                    index * 2 + 2
+                    index * 2 +
+                      2
                   ] = el;
                 }}
                 onClick={() =>
@@ -1620,8 +1953,10 @@ export default function AllWorksSection() {
   const [viewMode, setViewMode] =
     useState("grid");
 
-  const [visibleCount, setVisibleCount] =
-    useState(13);
+  const [
+    visibleCount,
+    setVisibleCount,
+  ] = useState(13);
 
   const [projects, setProjects] =
     useState([]);
@@ -1629,35 +1964,42 @@ export default function AllWorksSection() {
   const [isLoading, setIsLoading] =
     useState(true);
 
-  const [hoveredProject, setHoveredProject] =
-    useState(null);
+  const [
+    hoveredProject,
+    setHoveredProject,
+  ] = useState(null);
 
-  const [displayProject, setDisplayProject] =
-    useState(null);
+  const [
+    displayProject,
+    setDisplayProject,
+  ] = useState(null);
 
-  const [selectedClient, setSelectedClient] =
-    useState("ALL");
+  const [
+    selectedClient,
+    setSelectedClient,
+  ] = useState("ALL");
 
   // --------------------------------------------------
   // CLOUDINARY CONNECTION WARM-UP
   // --------------------------------------------------
-  // Fires as soon as we know the CDN origin (first project loaded),
-  // well before any individual card's IntersectionObserver decides to
-  // start pulling a video.
+  // Resolve the actual hero video rather than assuming heroVideos[0].
+
+  const firstProjectVideo =
+    useMemo(
+      () =>
+        getHeroVideoUrl(
+          projects?.[0]
+        ),
+      [projects]
+    );
 
   useCloudinaryPreconnect(
-    typeof projects?.[0]?.heroVideos?.[0]?.src === "string"
-      ? projects[0].heroVideos[0].src
-      : null
+    firstProjectVideo
   );
 
   // --------------------------------------------------
   // DESKTOP HOVER CAPABILITY
   // --------------------------------------------------
-  // Only enable the list background-video hover
-  // effect on actual hover-capable pointer devices.
-  // This prevents mobile/tablet taps from triggering
-  // synthesized mouseenter events.
 
   const [canHover, setCanHover] =
     useState(false);
@@ -1676,14 +2018,23 @@ export default function AllWorksSection() {
         setCanHover(enabled);
 
         if (!enabled) {
-          setHoveredProject(null);
-          setDisplayProject(null);
+          setHoveredProject(
+            null
+          );
 
-          if (bgVideoRef.current) {
+          setDisplayProject(
+            null
+          );
+
+          if (
+            bgVideoRef.current
+          ) {
             bgVideoRef.current.pause();
+
             bgVideoRef.current.removeAttribute(
               "src"
             );
+
             bgVideoRef.current.load();
           }
         }
@@ -1774,7 +2125,9 @@ export default function AllWorksSection() {
           const clientName =
             project.client?.trim();
 
-          if (!clientName) return;
+          if (!clientName) {
+            return;
+          }
 
           const normalizedName =
             clientName.toLowerCase();
@@ -1881,27 +2234,33 @@ export default function AllWorksSection() {
             ".work-card-reveal"
           );
 
-        if (!cards.length) return;
+        if (!cards.length) {
+          return;
+        }
 
         gsap.set(cards, {
           opacity: 0,
           y: 50,
-          filter: "blur(10px)",
+          filter:
+            "blur(10px)",
         });
 
         gsap.to(cards, {
           opacity: 1,
           y: 0,
-          filter: "blur(0px)",
+          filter:
+            "blur(0px)",
           duration: 0.9,
           stagger: 0.12,
           ease: "power4.out",
           delay: 0.1,
-          overwrite: "auto",
+          overwrite:
+            "auto",
         });
       }, containerRef);
 
-    return () => ctx.revert();
+    return () =>
+      ctx.revert();
   }, [
     viewMode,
     activeProjects,
@@ -1914,11 +2273,15 @@ export default function AllWorksSection() {
 
   const handleToggleView =
     (mode) => {
-      if (mode === viewMode) {
+      if (
+        mode === viewMode
+      ) {
         return;
       }
 
-      if (containerRef.current) {
+      if (
+        containerRef.current
+      ) {
         gsap.to(
           containerRef.current,
           {
@@ -1960,7 +2323,9 @@ export default function AllWorksSection() {
         return;
       }
 
-      if (containerRef.current) {
+      if (
+        containerRef.current
+      ) {
         gsap.to(
           containerRef.current,
           {
@@ -2046,8 +2411,7 @@ export default function AllWorksSection() {
   ]);
 
   // --------------------------------------------------
-  // PLAY BACKGROUND CLOUDINARY VIDEO
-  // (LIST VIEW ONLY / DESKTOP HOVER DEVICES)
+  // PLAY BACKGROUND VIDEO
   // --------------------------------------------------
 
   useEffect(() => {
@@ -2058,17 +2422,20 @@ export default function AllWorksSection() {
       return;
     }
 
+    // IMPORTANT:
+    // Resolve from every heroVideos entry.
     const rawSource =
-      typeof displayProject
-        ?.heroVideos?.[0]?.src ===
-      "string"
-        ? displayProject.heroVideos[0].src
-        : null;
+      getHeroVideoUrl(
+        displayProject
+      );
 
-    const source = getOptimizedVideoUrl(
-      rawSource,
-      { width: 1280 }
-    );
+    const source =
+      getOptimizedVideoUrl(
+        rawSource,
+        {
+          width: 1280,
+        }
+      );
 
     if (
       source &&
@@ -2077,7 +2444,9 @@ export default function AllWorksSection() {
       const video =
         bgVideoRef.current;
 
-      if (video.src !== source) {
+      if (
+        video.src !== source
+      ) {
         video.src = source;
         video.load();
       }
@@ -2142,7 +2511,8 @@ export default function AllWorksSection() {
               trigger:
                 listContainerRef.current,
 
-              start: "top 85%",
+              start:
+                "top 85%",
 
               toggleActions:
                 "play none none reset",
@@ -2151,7 +2521,8 @@ export default function AllWorksSection() {
         );
       }, listContainerRef);
 
-    return () => ctx.revert();
+    return () =>
+      ctx.revert();
   }, [
     viewMode,
     activeProjects,
@@ -2230,7 +2601,7 @@ export default function AllWorksSection() {
         ref={noiseRef}
       />
 
-      {/* BACKGROUND VIDEO (LIST VIEW ONLY / DESKTOP HOVER DEVICES) */}
+      {/* BACKGROUND VIDEO */}
 
       {canHover && (
         <div
@@ -2244,7 +2615,8 @@ export default function AllWorksSection() {
             duration-500
             ease-out
             ${
-              hoveredProject && viewMode === "list"
+              hoveredProject &&
+              viewMode === "list"
                 ? "opacity-100"
                 : "opacity-0"
             }
@@ -2253,19 +2625,19 @@ export default function AllWorksSection() {
           {displayProject && (
             <>
               {(() => {
+                // IMPORTANT:
+                // Do not use displayProject.heroVideos[0].
                 const rawSource =
-                  typeof displayProject
-                    ?.heroVideos?.[0]?.src ===
-                  "string"
-                    ? displayProject
-                        .heroVideos[0]
-                        .src
-                    : null;
+                  getHeroVideoUrl(
+                    displayProject
+                  );
 
                 const source =
                   getOptimizedVideoUrl(
                     rawSource,
-                    { width: 1280 }
+                    {
+                      width: 1280,
+                    }
                   );
 
                 return source ? (
@@ -2273,7 +2645,9 @@ export default function AllWorksSection() {
                     key={
                       displayProject._id
                     }
-                    ref={bgVideoRef}
+                    ref={
+                      bgVideoRef
+                    }
                     src={source}
                     autoPlay
                     muted
@@ -2331,7 +2705,8 @@ export default function AllWorksSection() {
 
             <sup className="text-[clamp(1rem,2vw,1.875rem)] pt-1 sm:pt-6 leading-none font-sans font-medium tracking-tight">
               [
-              {projects.length < 10
+              {projects.length <
+              10
                 ? `0${projects.length}`
                 : projects.length}
               ]
@@ -2872,7 +3247,9 @@ export default function AllWorksSection() {
 
               <div className="flex flex-col divide-y divide-zinc-800/60">
                 {activeProjects.map(
-                  (project) => (
+                  (
+                    project
+                  ) => (
                     <ListItemRow
                       key={
                         project._id
@@ -2909,7 +3286,8 @@ export default function AllWorksSection() {
                 </div>
               )}
 
-              {visibleCount < filteredProjects.length && (
+              {visibleCount <
+                filteredProjects.length && (
                 <div className="flex justify-center pt-12">
                   <button
                     onClick={
