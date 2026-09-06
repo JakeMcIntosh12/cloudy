@@ -97,7 +97,7 @@ function WebGLContextGuard() {
 }
 
 /* =========================================================
-   RADIAL STEAM (ORIGINAL CLOUD DATA PRESERVED)
+   RADIAL STEAM
 ========================================================= */
 
 function RadialVaporRing() {
@@ -107,20 +107,33 @@ function RadialVaporRing() {
   const smoothDepth = useRef(0);
   const docHeightRef = useRef(1);
 
-  // Cache document height on resize to prevent layout thrashing inside useFrame
   useEffect(() => {
     const updateDocHeight = () => {
       if (typeof document !== "undefined") {
         const docElement = document.documentElement;
+
         docHeightRef.current = docElement
-          ? Math.max(1, docElement.scrollHeight - window.innerHeight)
+          ? Math.max(
+              1,
+              docElement.scrollHeight - window.innerHeight
+            )
           : 1;
       }
     };
 
     updateDocHeight();
-    window.addEventListener("resize", updateDocHeight, { passive: true });
-    return () => window.removeEventListener("resize", updateDocHeight);
+
+    window.addEventListener(
+      "resize",
+      updateDocHeight,
+      { passive: true }
+    );
+
+    return () =>
+      window.removeEventListener(
+        "resize",
+        updateDocHeight
+      );
   }, []);
 
   useFrame((state, delta) => {
@@ -150,7 +163,8 @@ function RadialVaporRing() {
     ======================================================= */
 
     const progress = THREE.MathUtils.clamp(
-      scrollState.current / docHeightRef.current,
+      scrollState.current /
+        docHeightRef.current,
       0,
       1
     );
@@ -346,14 +360,29 @@ export default function GlobalCinematicFog() {
 
   return (
     <div
-      className="fixed inset-0 w-full h-full pointer-events-none z-40 overflow-hidden"
+      className="fixed left-0 top-0 w-screen h-screen pointer-events-none z-40 overflow-hidden"
       style={{
+        width: "100vw",
+        height: "100vh",
+        height: "100dvh",
         pointerEvents: "none",
+
+        /* Prevent mobile browser compositing from
+           visually separating the WebGL layer */
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
+
+        /* Keep the layer isolated */
+        isolation: "isolate",
+
+        /* Prevent accidental touch interaction */
+        touchAction: "none",
       }}
     >
       <WebGLSceneErrorBoundary>
         <Canvas
-          dpr={[1, 1.5]} // Caps pixel density to prevent 3x render overhead on high-DPR phones
+          dpr={[1, 1.5]}
           camera={{
             position: [0, 0, 7],
             fov: 75,
@@ -365,9 +394,16 @@ export default function GlobalCinematicFog() {
             stencil: false,
           }}
           style={{
-            pointerEvents: "none",
+            position: "absolute",
+            inset: 0,
+            display: "block",
             width: "100%",
             height: "100%",
+            pointerEvents: "none",
+
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
           }}
           events={() => ({
             enabled: false,

@@ -632,9 +632,6 @@ function WorkCard({
           }
         },
         {
-          // Tightened from 2000px so we don't kick off every
-          // video's download on initial mount regardless of
-          // scroll position.
           rootMargin:
             "400px 0px",
           threshold: 0,
@@ -997,6 +994,7 @@ function ListItemRow({
   project,
   onHoverStart,
   onHoverEnd,
+  hoverEnabled = true,
 }) {
   const rowRef =
     useRef(null);
@@ -1012,6 +1010,10 @@ function ListItemRow({
 
   const activateRow =
     useCallback(async () => {
+      if (!hoverEnabled) {
+        return;
+      }
+
       onHoverStart(project);
 
       gsap.to(rowRef.current, {
@@ -1048,12 +1050,17 @@ function ListItemRow({
         overwrite: "auto",
       });
     }, [
+      hoverEnabled,
       onHoverStart,
       project,
     ]);
 
   const deactivateRow =
     useCallback(() => {
+      if (!hoverEnabled) {
+        return;
+      }
+
       onHoverEnd();
 
       gsap.to(rowRef.current, {
@@ -1090,7 +1097,10 @@ function ListItemRow({
         ease: "power3.out",
         overwrite: "auto",
       });
-    }, [onHoverEnd]);
+    }, [
+      hoverEnabled,
+      onHoverEnd,
+    ]);
 
   return (
     <div
@@ -1470,6 +1480,59 @@ export default function AllWorksSection() {
     useState("ALL");
 
   // --------------------------------------------------
+  // DESKTOP HOVER CAPABILITY
+  // --------------------------------------------------
+  // Only enable the list background-video hover
+  // effect on actual hover-capable pointer devices.
+  // This prevents mobile/tablet taps from triggering
+  // synthesized mouseenter events.
+
+  const [canHover, setCanHover] =
+    useState(false);
+
+  useEffect(() => {
+    const mediaQuery =
+      window.matchMedia(
+        "(hover: hover) and (pointer: fine)"
+      );
+
+    const updateHoverCapability =
+      () => {
+        const enabled =
+          mediaQuery.matches;
+
+        setCanHover(enabled);
+
+        if (!enabled) {
+          setHoveredProject(null);
+          setDisplayProject(null);
+
+          if (bgVideoRef.current) {
+            bgVideoRef.current.pause();
+            bgVideoRef.current.removeAttribute(
+              "src"
+            );
+            bgVideoRef.current.load();
+          }
+        }
+      };
+
+    updateHoverCapability();
+
+    mediaQuery.addEventListener(
+      "change",
+      updateHoverCapability
+    );
+
+    return () => {
+      mediaQuery.removeEventListener(
+        "change",
+        updateHoverCapability
+      );
+    };
+  }, []);
+
+  // --------------------------------------------------
   // FETCH PROJECTS
   // --------------------------------------------------
 
@@ -1797,20 +1860,29 @@ export default function AllWorksSection() {
   // --------------------------------------------------
 
   useEffect(() => {
-    if (hoveredProject) {
+    if (
+      hoveredProject &&
+      canHover
+    ) {
       setDisplayProject(
         hoveredProject
       );
     }
-  }, [hoveredProject]);
+  }, [
+    hoveredProject,
+    canHover,
+  ]);
 
   // --------------------------------------------------
   // PLAY BACKGROUND CLOUDINARY VIDEO
-  // (LIST VIEW ONLY)
+  // (LIST VIEW ONLY / DESKTOP HOVER DEVICES)
   // --------------------------------------------------
 
   useEffect(() => {
-    if (viewMode !== "list") {
+    if (
+      viewMode !== "list" ||
+      !canHover
+    ) {
       return;
     }
 
@@ -1854,6 +1926,7 @@ export default function AllWorksSection() {
     displayProject,
     hoveredProject,
     viewMode,
+    canHover,
   ]);
 
   // --------------------------------------------------
@@ -1985,70 +2058,72 @@ export default function AllWorksSection() {
         ref={noiseRef}
       />
 
-      {/* BACKGROUND VIDEO (LIST VIEW ONLY) */}
+      {/* BACKGROUND VIDEO (LIST VIEW ONLY / DESKTOP HOVER DEVICES) */}
 
-      <div
-        className={`
-          fixed
-          inset-0
-          z-0
-          pointer-events-none
-          overflow-hidden
-          transition-opacity
-          duration-500
-          ease-out
-          ${
-            hoveredProject && viewMode === "list"
-              ? "opacity-100"
-              : "opacity-0"
-          }
-        `}
-      >
-        {displayProject && (
-          <>
-            {(() => {
-              const rawSource =
-                typeof displayProject
-                  ?.heroVideos?.[0]?.src ===
-                "string"
-                  ? displayProject
-                      .heroVideos[0]
-                      .src
-                  : null;
+      {canHover && (
+        <div
+          className={`
+            fixed
+            inset-0
+            z-0
+            pointer-events-none
+            overflow-hidden
+            transition-opacity
+            duration-500
+            ease-out
+            ${
+              hoveredProject && viewMode === "list"
+                ? "opacity-100"
+                : "opacity-0"
+            }
+          `}
+        >
+          {displayProject && (
+            <>
+              {(() => {
+                const rawSource =
+                  typeof displayProject
+                    ?.heroVideos?.[0]?.src ===
+                  "string"
+                    ? displayProject
+                        .heroVideos[0]
+                        .src
+                    : null;
 
-              const source =
-                getOptimizedVideoUrl(
-                  rawSource,
-                  { width: 1280 }
-                );
+                const source =
+                  getOptimizedVideoUrl(
+                    rawSource,
+                    { width: 1280 }
+                  );
 
-              return source ? (
-                <video
-                  key={
-                    displayProject._id
-                  }
-                  ref={bgVideoRef}
-                  src={source}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                  className="
-                    absolute
-                    inset-0
-                    w-full
-                    h-full
-                    object-cover
-                  "
-                />
-              ) : null;
-            })()}
-          </>
-        )}
+                return source ? (
+                  <video
+                    key={
+                      displayProject._id
+                    }
+                    ref={bgVideoRef}
+                    src={source}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                    className="
+                      absolute
+                      inset-0
+                      w-full
+                      h-full
+                      object-cover
+                    "
+                  />
+                ) : null;
+              })()}
+            </>
+          )}
 
-        <div className="absolute inset-0 bg-black/60" />
-      </div>
+          <div className="absolute inset-0 bg-black/60" />
+        </div>
+      )}
 
       {/* NAVIGATION */}
 
@@ -2631,6 +2706,9 @@ export default function AllWorksSection() {
                       }
                       project={
                         project
+                      }
+                      hoverEnabled={
+                        canHover
                       }
                       onHoverStart={(
                         projectData
