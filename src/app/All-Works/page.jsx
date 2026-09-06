@@ -45,13 +45,14 @@ const WORKS_QUERY = groq`
     date,
     "slug": slug.current,
 
-    heroVideos[] {
+    heroVideos[]{
       _key,
-      "src": coalesce(
-        asset->url,
-        url
+      "src": select(
+        sourceType == "cloudinary" => url,
+        sourceType == "sanity" => video.asset->url,
+        null
       )
-    }
+    },
   }
 `;
 

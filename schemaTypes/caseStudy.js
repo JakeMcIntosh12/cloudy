@@ -54,34 +54,17 @@ export default defineType({
     // HERO VIDEOS
     // =========================================================
 
-    defineField({
+   defineField({
   name: "heroVideos",
   title: "Hero Videos",
-  description:
-    "Add hero videos either by uploading a video directly to Sanity or by providing a Cloudinary URL.",
+  description: "Upload hero videos directly to Sanity.",
   type: "array",
   of: [
     {
       type: "object",
       name: "heroVideo",
       title: "Hero Video",
-
       fields: [
-        defineField({
-          name: "sourceType",
-          title: "Video Source",
-          type: "string",
-          options: {
-            list: [
-              { title: "Upload to Sanity", value: "sanity" },
-              { title: "Cloudinary URL", value: "cloudinary" },
-            ],
-            layout: "radio",
-          },
-          initialValue: "sanity",
-          validation: (Rule) => Rule.required(),
-        }),
-
         defineField({
           name: "video",
           title: "Upload Video",
@@ -89,35 +72,17 @@ export default defineType({
           options: {
             accept: "video/*",
           },
-          hidden: ({ parent }) => parent?.sourceType !== "sanity",
-        }),
-
-        defineField({
-          name: "url",
-          title: "Cloudinary URL",
-          type: "url",
-          hidden: ({ parent }) => parent?.sourceType !== "cloudinary",
+          validation: (Rule) => Rule.required(),
         }),
       ],
-
       preview: {
         select: {
-          sourceType: "sourceType",
           videoName: "video.asset.originalFilename",
-          url: "url",
         },
-
-        prepare({ sourceType, videoName, url }) {
+        prepare({ videoName }) {
           return {
-            title:
-              sourceType === "cloudinary"
-                ? "Cloudinary Video"
-                : videoName || "Sanity Video",
-
-            subtitle:
-              sourceType === "cloudinary"
-                ? url || "No Cloudinary URL"
-                : "Uploaded to Sanity",
+            title: videoName || "Sanity Video",
+            subtitle: "Uploaded to Sanity",
           };
         },
       },

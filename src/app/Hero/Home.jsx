@@ -1,8 +1,13 @@
 "use client"
 
 import Controls from '@/components/UI/Controls'
+
 import Navigation from '@/components/UI/Navigation'
+
 import HeroCanvas from '@/components/react-three/HeroCanvas'
+
+import { client } from '@/lib/client'
+
 import React, {
   useState,
   useCallback,
@@ -10,7 +15,9 @@ import React, {
   useEffect,
   useMemo
 } from 'react'
+
 import { useGSAP } from '@gsap/react'
+
 import gsap from 'gsap'
 
 // Helper to optimize Cloudinary URLs specifically for mobile devices
@@ -30,20 +37,30 @@ const getMobileOptimizedUrl = (url) => {
   return url
 }
 
-const RAW_PROJECTS = [
-  {
-    src: 'https://res.cloudinary.com/eafm1vdw/video/upload/v1787731790/cloudhaus_landing_video_1440p.mp4',
-    title: 'THE BUILDING COMPANY'
-  },
-]
-
 const BOTTOM_TEXT =
   "VISUAL STUDIO FOR HIGH-END ARCHITECTURE AND CONSTRUCTION BASED IN ADELAIDE"
 
+const HOME_CONTENT_QUERY = `
+  *[
+    _type == "homeContent"
+  ][0]
+  {
+    "heroVideo": heroVideo.asset->url
+  }
+`
+
 function Home() {
   const [currentIndex, setCurrentIndex] = useState(0)
+
   const [nextIndex, setNextIndex] = useState(null)
+
   const [isTransitioning, setIsTransitioning] = useState(false)
+
+  // =========================================================
+  // SANITY HERO VIDEO
+  // =========================================================
+
+  const [heroVideo, setHeroVideo] = useState(null)
 
   // Video duration
   const [duration, setDuration] = useState('00:00')
@@ -53,18 +70,24 @@ function Home() {
   // =========================================================
 
   const [progress, setProgress] = useState(0)
+
   const [isLoaded, setIsLoaded] = useState(false)
-  const [preloaderUnmounted, setPreloaderUnmounted] = useState(false)
+
+  const [preloaderUnmounted, setPreloaderUnmounted] =
+    useState(false)
 
   // =========================================================
   // AUDIO & DOM REFS
   // =========================================================
 
   const [isMuted, setIsMuted] = useState(true)
+
   const activeVideoRef = useRef(null)
 
   const preloaderRef = useRef(null)
+
   const progressBarRef = useRef(null)
+
   const counterRef = useRef(null)
 
   const targetProgress = useRef(0)
@@ -74,16 +97,21 @@ function Home() {
 
   // Bottom UI Animation Refs
   const bottomTextRef = useRef(null)
+
   const scrollTextRef = useRef(null)
 
   // =========================================================
   // INTERACTION GUIDE
   // =========================================================
 
-  const [showInteractionGuide, setShowInteractionGuide] = useState(false)
-  const [interactionGuideDismissed, setInteractionGuideDismissed] = useState(false)
+  const [showInteractionGuide, setShowInteractionGuide] =
+    useState(false)
+
+  const [interactionGuideDismissed, setInteractionGuideDismissed] =
+    useState(false)
 
   const interactionGuideRef = useRef(null)
+
   const interactionGuideBackdropRef = useRef(null)
 
   // Prevent the interaction guide from being triggered
@@ -91,15 +119,64 @@ function Home() {
   const interactionGuideShownRef = useRef(false)
 
   // =========================================================
+  // FETCH HERO VIDEO FROM SANITY
+  // =========================================================
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchHomeContent() {
+      try {
+        const data = await client.fetch(
+          HOME_CONTENT_QUERY,
+          {},
+          {
+            next: {
+              revalidate: 60,
+            },
+          }
+        )
+
+        if (cancelled) return
+
+        setHeroVideo(
+          data?.heroVideo || null
+        )
+      } catch (error) {
+        console.error(
+          'Failed to fetch Home content from Sanity:',
+          error
+        )
+
+        if (!cancelled) {
+          setHeroVideo(null)
+        }
+      }
+    }
+
+    fetchHomeContent()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // =========================================================
   // PROCESS PROJECT VIDEO URL
   // =========================================================
 
   const PROJECTS = useMemo(() => {
-    return RAW_PROJECTS.map((project) => ({
-      ...project,
-      src: getMobileOptimizedUrl(project.src)
-    }))
-  }, [])
+    if (!heroVideo) {
+      return []
+    }
+
+    return [
+      {
+        src: getMobileOptimizedUrl(heroVideo),
+        title: 'THE BUILDING COMPANY'
+      }
+    ]
+  }, [heroVideo])
 
   // =========================================================
   // SPLIT SENTENCE INTO WORDS
@@ -123,6 +200,7 @@ function Home() {
     }
 
     const mins = Math.floor(seconds / 60)
+
     const secs = Math.floor(seconds % 60)
 
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
@@ -182,6 +260,7 @@ function Home() {
           targetProgress.current >= 100
         ) {
           clearInterval(interval)
+
           return 100
         }
 
@@ -365,6 +444,7 @@ function Home() {
 
     if (hasShownInteractionGuide === 'true') {
       interactionGuideShownRef.current = true
+
       return
     }
 
@@ -383,6 +463,7 @@ function Home() {
 
       if (alreadyShown === 'true') {
         interactionGuideShownRef.current = true
+
         return
       }
 
@@ -470,13 +551,16 @@ function Home() {
 
     if (!card) {
       setShowInteractionGuide(false)
+
       setInteractionGuideDismissed(true)
+
       return
     }
 
     const tl = gsap.timeline({
       onComplete: () => {
         setShowInteractionGuide(false)
+
         setInteractionGuideDismissed(true)
       }
     })
@@ -691,6 +775,7 @@ function Home() {
 
       const handleCanPlayThrough = () => {
         targetProgress.current = 100
+
         updateDuration()
       }
 
@@ -858,7 +943,6 @@ function Home() {
 
       {/* =====================================================
           PRELOADER
-
           IMPORTANT:
           No sessionStorage here.
           Therefore the preloader runs every time
@@ -915,10 +999,13 @@ function Home() {
         >
           <HeroCanvas
             activeSrc={
-              PROJECTS[currentIndex].src
+              PROJECTS.length > 0
+                ? PROJECTS[currentIndex].src
+                : null
             }
             nextSrc={
-              nextIndex !== null
+              nextIndex !== null &&
+              PROJECTS.length > 0
                 ? PROJECTS[nextIndex].src
                 : null
             }
@@ -947,6 +1034,7 @@ function Home() {
         {/* FOREGROUND UI WRAPPER */}
 
         <div className="relative z-10 w-full h-full p-4 pt-20 flex flex-col justify-between box-border pointer-events-none">
+
           <div aria-hidden="true" />
 
           {/* CONTROLS */}
@@ -963,7 +1051,9 @@ function Home() {
                 PROJECTS.length
               }
               title={
-                PROJECTS[currentIndex].title
+                PROJECTS.length > 0
+                  ? PROJECTS[currentIndex].title
+                  : ''
               }
               duration={
                 duration
@@ -977,6 +1067,7 @@ function Home() {
           {/* BOTTOM UI */}
 
           <div className="flex flex-col gap-4 md:flex-row items-start md:items-end justify-between w-full mb-0 text-white font-geist-mono uppercase tracking-tight leading-[140%] md:leading-normal pointer-events-auto">
+
             <p
               ref={
                 bottomTextRef
@@ -1009,6 +1100,7 @@ function Home() {
             >
               (scroll down)
             </p>
+
           </div>
         </div>
 
@@ -1059,6 +1151,7 @@ function Home() {
             "
           >
             <div className="relative aspect-video w-full overflow-hidden bg-zinc-900 pt-2">
+
               <video
                 src="/Images/guide.mp4"
                 autoPlay
@@ -1101,6 +1194,7 @@ function Home() {
               >
                 ×
               </button>
+
             </div>
 
             <div className="px-3 py-2.5">
@@ -1110,6 +1204,7 @@ function Home() {
             </div>
           </div>
         )}
+
       </main>
     </>
   )

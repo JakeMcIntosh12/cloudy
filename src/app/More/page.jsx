@@ -54,11 +54,12 @@ const SELECTED_WORKS_QUERY = `
 
     heroVideos[]{
       _key,
-      "src": coalesce(
-        asset->url,
-        url
+      "src": select(
+        sourceType == "cloudinary" => url,
+        sourceType == "sanity" => video.asset->url,
+        null
       )
-    }
+    },
   }
 `;
 
@@ -76,6 +77,21 @@ const TOTAL_WORKS_COUNT_QUERY = `
       defined(slug.current)
     ]
   )
+`;
+
+// ----------------------------------------------------------------------
+// SANITY ABOUT CONTENT QUERY
+//
+// Pulls the brief intro text from the global About Content document.
+// ----------------------------------------------------------------------
+
+const ABOUT_CONTENT_QUERY = `
+  *[
+    _type == "aboutContent"
+  ][0]
+  {
+    briefIntroText
+  }
 `;
 
 // ----------------------------------------------------------------------
@@ -795,7 +811,16 @@ export default function Page() {
   ] = useState(true);
 
   // --------------------------------------------------------------------
-  // FETCH SELECTED WORKS + TOTAL WORK COUNT
+  // SANITY ABOUT CONTENT STATE
+  // --------------------------------------------------------------------
+
+  const [
+    aboutContent,
+    setAboutContent,
+  ] = useState(null);
+
+  // --------------------------------------------------------------------
+  // FETCH SELECTED WORKS + TOTAL WORK COUNT + ABOUT CONTENT
   // --------------------------------------------------------------------
 
   useEffect(() => {
@@ -808,6 +833,7 @@ export default function Page() {
         const [
           selectedData,
           totalCount,
+          aboutData,
         ] = await Promise.all([
           client.fetch(
             SELECTED_WORKS_QUERY,
@@ -828,11 +854,29 @@ export default function Page() {
               },
             }
           ),
+
+          client.fetch(
+            ABOUT_CONTENT_QUERY,
+            {},
+            {
+              next: {
+                revalidate: 60,
+              },
+            }
+          ),
         ]);
 
         if (cancelled) {
           return;
         }
+
+        // --------------------------------------------------------------
+        // ABOUT CONTENT
+        // --------------------------------------------------------------
+
+        setAboutContent(
+          aboutData || null
+        );
 
         // --------------------------------------------------------------
         // NORMALIZE ONLY THE 5 SHOWCASED PROJECTS
@@ -902,6 +946,7 @@ export default function Page() {
         if (!cancelled) {
           setSelectedWorks([]);
           setTotalWorks(0);
+          setAboutContent(null);
         }
       } finally {
         if (!cancelled) {
@@ -1095,7 +1140,10 @@ export default function Page() {
           <div className="flex flex-col items-start justify-end space-y-8 lg:space-y-12 w-full md:w-[50%] md:translate-x-[clamp(0rem,8vw,2rem)] lg:translate-x-[clamp(0rem,10vw,0.5rem)] font-medium">
 
             <SmudgyTextReveal
-              text="A building can speak volumes before a single word is said. We create visuals that make people feel the thinking, craft and ambition behind every project."
+              text={
+                aboutContent?.briefIntroText ||
+                ""
+              }
             />
 
             <BlurFlicker>
@@ -1226,7 +1274,7 @@ export default function Page() {
                   video={
                     selectedWorks[2]
                   }
-                 heightClassName="w-screen left-1/2 -translate-x-1/2 h-[60vh] lg:h-screen"
+                  heightClassName="w-screen left-1/2 -translate-x-1/2 h-[60vh] lg:h-screen"
                   onHoverChange={
                     handleHoverChange
                   }

@@ -1,18 +1,31 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Navigation from '@/components/UI/Navigation'
 import Image from 'next/image'
 import Lenis from 'lenis'
 import gsap from 'gsap'
 import { SplitText } from 'gsap/SplitText'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import Link from 'next/link'
 import TransitionLink from '@/components/PageTransitions/TransitionLink'
 import BlurFlicker from '@/components/Animations/BlurFlicker'
 import { useGSAP } from '@gsap/react'
+import { client } from '@/lib/client'
 
 gsap.registerPlugin(SplitText, ScrollTrigger)
+
+/* =========================================================
+   SANITY ABOUT CONTENT QUERY
+   ========================================================= */
+
+const ABOUT_CONTENT_QUERY = `
+  *[
+    _type == "aboutContent"
+  ][0]
+  {
+    aboutText
+  }
+`
 
 /* =========================================================
    SPLIT LINES REVEAL
@@ -187,6 +200,12 @@ export default function Page() {
 
   const bottomContentRef = useRef(null)
 
+  /* =======================================================
+     SANITY ABOUT CONTENT
+     ======================================================= */
+
+  const [aboutContent, setAboutContent] = useState(null)
+
   useGSAP(
     () => {
       if (!bottomContentRef.current) return
@@ -221,6 +240,47 @@ export default function Page() {
       scope: bottomContentRef,
     }
   )
+
+  /* =======================================================
+     FETCH ABOUT CONTENT FROM SANITY
+     ======================================================= */
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchAboutContent() {
+      try {
+        const data = await client.fetch(
+          ABOUT_CONTENT_QUERY,
+          {},
+          {
+            next: {
+              revalidate: 60,
+            },
+          }
+        )
+
+        if (cancelled) return
+
+        setAboutContent(data || null)
+      } catch (error) {
+        console.error(
+          'Failed to fetch About content from Sanity:',
+          error
+        )
+
+        if (!cancelled) {
+          setAboutContent(null)
+        }
+      }
+    }
+
+    fetchAboutContent()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   /* =======================================================
      LENIS
@@ -325,7 +385,7 @@ export default function Page() {
             {/* SPLIT LINE REVEAL */}
 
             <ExtrudedTextReveal
-              text="Since 2019, Cloudhaus has created cinematic films and photography for high-end architecture and construction. Led by Jake McIntosh, the studio operates on the belief that exceptional work deserves to be documented with the same care and craftsmanship that brought it into being."
+              text={aboutContent?.aboutText || ''}
             />
           </div>
 
@@ -366,7 +426,12 @@ export default function Page() {
                 >
                   <p>0404 104 360</p>
                   <p>ADELAIDE, SOUTH AUSTRALIA</p>
-                  <a className="hover:text-zinc-600 hover:font-medium transition trransition-all duration-500" href="mailto:hello@cloudhaus.com">hello@cloudhaus.com</a>
+                  <a
+                    className="hover:text-zinc-600 hover:font-medium transition trransition-all duration-500"
+                    href="mailto:hello@cloudhaus.com"
+                  >
+                    hello@cloudhaus.com
+                  </a>
                 </div>
               </div>
             </div>
@@ -454,8 +519,6 @@ export default function Page() {
                     INSTAGRAM
                   </a>
                 </BlurFlicker>
-
-               
 
                 <BlurFlicker>
                   <a

@@ -9,11 +9,26 @@ import Link from "next/link";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { client } from "@/lib/client";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/* =====================================================
+   SANITY FOOTER CONTENT QUERY
+   ===================================================== */
+
+const FOOTER_CONTENT_QUERY = `
+  *[
+    _type == "aboutContent"
+  ][0]
+  {
+    footerClosingText
+  }
+`;
+
 function Footer() {
   const [time, setTime] = useState("");
+  const [footerContent, setFooterContent] = useState(null);
 
   const logoRef = useRef(null);
   const metaRef = useRef(null);
@@ -54,6 +69,47 @@ function Footer() {
     const interval = setInterval(updateTime, 1000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  /* =====================================================
+     FETCH FOOTER CONTENT FROM SANITY
+     ===================================================== */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchFooterContent() {
+      try {
+        const data = await client.fetch(
+          FOOTER_CONTENT_QUERY,
+          {},
+          {
+            next: {
+              revalidate: 60,
+            },
+          }
+        );
+
+        if (cancelled) return;
+
+        setFooterContent(data || null);
+      } catch (error) {
+        console.error(
+          "Failed to fetch Footer content from Sanity:",
+          error
+        );
+
+        if (!cancelled) {
+          setFooterContent(null);
+        }
+      }
+    }
+
+    fetchFooterContent();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* =====================================================
@@ -175,9 +231,10 @@ function Footer() {
           <div className="flex flex-col space-y-[clamp(1.2rem,2vw,1.3rem)]">
             <ExtrudedElevationReveal
               variant="footer"
-              text={`Good work speaks for itself.
-
-Great work deserves to be seen.`}
+              text={
+                footerContent?.footerClosingText ||
+                ""
+              }
             />
 
             <p className="w-full max-w-[clamp(20rem,40vw,22.875rem)] text-[clamp(0.8rem,1vw,1rem)] text-zinc-600 leading-[130%] font-geist-mono uppercase">
@@ -558,8 +615,8 @@ Great work deserves to be seen.`}
               fill="white"
             />
             <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
+              fillRule="evenodd"
+              clipRule="evenodd"
               d="M41.0538 0.38585V32.8691C41.0538 33.0816 40.8588 33.254 40.6186 33.254H27.6422C27.402 33.254 27.207 33.0816 27.207 32.8691V0.38585C27.207 0.1734 27.402 0.000976562 27.6422 0.000976562H40.6186C40.8588 0.000976562 41.0538 0.1734 41.0538 0.38585Z"
               fill="white"
             />
@@ -580,14 +637,14 @@ Great work deserves to be seen.`}
               fill="white"
             />
             <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
+              fillRule="evenodd"
+              clipRule="evenodd"
               d="M152.752 0.384868V32.8683C152.752 33.0805 152.542 33.2532 152.284 33.2532H139.372C139.113 33.2532 138.904 33.0805 138.904 32.8683V0.384868C138.904 0.172428 139.113 0 139.372 0H152.284C152.542 0 152.752 0.172428 152.752 0.384868Z"
               fill="white"
             />
             <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
+              fillRule="evenodd"
+              clipRule="evenodd"
               d="M172.142 0.384868V32.8683C172.142 33.0805 171.932 33.2532 171.674 33.2532H158.763C158.505 33.2532 158.295 33.0805 158.295 32.8683V0.384868C158.295 0.172428 158.505 0 158.763 0H171.674C171.932 0 172.142 0.172428 172.142 0.384868Z"
               fill="white"
             />
