@@ -11,7 +11,7 @@ function notfound() {
 
       <nav className="w-full px-4 md:px-8 absolute top-6 flex items-center justify-between">
         <div className="font-mono tracking-tight text-[clamp(0.55rem,1.1vw,0.75rem)] md:text-[clamp(0.75rem,1.3vw,1.125rem)]">
-          <h2 className="text-zinc-600">ERROR_PAGE</h2>
+          <h2 className="text-zinc-600">OOPS!</h2>
           <p className="text-ghost-white">
             THIS PAGE IS STILL IN THE BLUEPRINT PHASE.
           </p>
