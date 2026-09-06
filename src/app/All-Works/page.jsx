@@ -63,15 +63,28 @@ const WORKS_QUERY = groq`
 // the URL so we transcode/compress/resize on the fly instead of shipping
 // the raw uploaded master file. Falls back to the original URL if it
 // isn't a Cloudinary /upload/ URL (e.g. a plain external url field).
+//
+// A bitrate cap (br_) is included alongside q_auto/vc_auto because the
+// auto-quality setting alone still allows fairly high bitrates on busy
+// footage. Capping it keeps payload size predictable at these small
+// preview render sizes without a visible quality hit.
+
+function getBitrateForWidth(width) {
+  if (width <= 640) return "800k";
+  if (width <= 960) return "1200k";
+  return "2000k";
+}
 
 function getOptimizedVideoUrl(url, { width = 960 } = {}) {
   if (!url || typeof url !== "string" || !url.includes("/upload/")) {
     return url;
   }
 
+  const bitrate = getBitrateForWidth(width);
+
   return url.replace(
     "/upload/",
-    `/upload/q_auto:eco,f_auto,w_${width},vc_auto/`
+    `/upload/q_auto:eco,f_auto,w_${width},vc_auto,br_${bitrate}/`
   );
 }
 
@@ -87,6 +100,99 @@ function getVideoPosterUrl(url, { width = 960 } = {}) {
       `/upload/q_auto,f_jpg,w_${width},so_1/`
     )
     .replace(/\.\w+($|\?)/, ".jpg$1");
+}
+
+function getCloudinaryOrigin(url) {
+  if (!url || typeof url !== "string") {
+    return null;
+  }
+
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+// --------------------------------------------------------------------
+// CONNECTION WARM-UP
+// --------------------------------------------------------------------
+// Opens the DNS + TLS + TCP connection to the Cloudinary origin as soon
+// as we know it (right after the Sanity fetch resolves), instead of
+// waiting for the first <video> tag to trigger it. This shaves the
+// handshake time off of however many hundred milliseconds it takes the
+// first hero video to actually start downloading.
+//
+// Two preconnect hints are added (with and without crossorigin) since
+// whether the browser treats the eventual video fetch as CORS or not
+// can vary, and mismatching it means the preconnect is wasted.
+
+function useCloudinaryPreconnect(url) {
+  useEffect(() => {
+    const origin = getCloudinaryOrigin(url);
+
+    if (!origin || typeof document === "undefined") {
+      return;
+    }
+
+    const marker = `link[data-cloudinary-preconnect="${origin}"]`;
+
+    if (document.head.querySelector(marker)) {
+      return;
+    }
+
+    const links = [];
+
+    const preconnect = document.createElement("link");
+    preconnect.rel = "preconnect";
+    preconnect.href = origin;
+    preconnect.setAttribute("data-cloudinary-preconnect", origin);
+    links.push(preconnect);
+
+    const preconnectCors = document.createElement("link");
+    preconnectCors.rel = "preconnect";
+    preconnectCors.href = origin;
+    preconnectCors.crossOrigin = "anonymous";
+    preconnectCors.setAttribute("data-cloudinary-preconnect", origin);
+    links.push(preconnectCors);
+
+    const dnsPrefetch = document.createElement("link");
+    dnsPrefetch.rel = "dns-prefetch";
+    dnsPrefetch.href = origin;
+    dnsPrefetch.setAttribute("data-cloudinary-preconnect", origin);
+    links.push(dnsPrefetch);
+
+    links.forEach((link) => document.head.appendChild(link));
+  }, [url]);
+}
+
+// --------------------------------------------------------------------
+// VIEWPORT-AWARE VIDEO WIDTH
+// --------------------------------------------------------------------
+// Mobile connections and mobile-sized render targets don't need the
+// same 960px source the desktop grid uses. This trims payload size for
+// the majority-mobile traffic pattern most of these sites see.
+
+function useIsMobileViewport() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+
+    const update = () => setIsMobile(mediaQuery.matches);
+
+    update();
+
+    mediaQuery.addEventListener("change", update);
+
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  return isMobile;
 }
 
 // ----------------------------------------------------------------------
@@ -533,6 +639,8 @@ function WorkCard({
   const videoRef =
     useRef(null);
 
+  const isMobile = useIsMobileViewport();
+
   const mobileVideoHeight =
     useMemo(
       () =>
@@ -550,20 +658,24 @@ function WorkCard({
       ? video.heroVideos[0].src.trim()
       : null;
 
+  // Smaller source width on mobile viewports — less payload, faster
+  // start on the connections most likely to be bandwidth-constrained.
+  const videoWidth = isMobile ? 640 : 960;
+
   const cloudinaryUrl = useMemo(
     () =>
       getOptimizedVideoUrl(rawUrl, {
-        width: 960,
+        width: videoWidth,
       }),
-    [rawUrl]
+    [rawUrl, videoWidth]
   );
 
   const posterUrl = useMemo(
     () =>
       getVideoPosterUrl(rawUrl, {
-        width: 960,
+        width: videoWidth,
       }),
-    [rawUrl]
+    [rawUrl, videoWidth]
   );
 
   // --------------------------------------------------
@@ -632,8 +744,10 @@ function WorkCard({
           }
         },
         {
+          // Loaded well ahead of it actually entering the viewport so
+          // the buffer is warm by the time the user scrolls to it.
           rootMargin:
-            "400px 0px",
+            "600px 0px",
           threshold: 0,
         }
       );
@@ -648,6 +762,47 @@ function WorkCard({
     priority,
     loadVideo,
   ]);
+
+  // --------------------------------------------------
+  // PRIORITY VIDEO PRELOAD HINT
+  // --------------------------------------------------
+  // For above-the-fold cards, drop a <link rel="preload" as="video">
+  // into <head> so the browser starts the fetch at the same time it
+  // decides to render the <video> tag, rather than only discovering
+  // the request once the element itself is parsed and mounted.
+
+  useEffect(() => {
+    if (
+      !priority ||
+      !cloudinaryUrl ||
+      typeof document === "undefined"
+    ) {
+      return;
+    }
+
+    const marker = `link[data-video-preload="${cloudinaryUrl}"]`;
+
+    if (document.head.querySelector(marker)) {
+      return;
+    }
+
+    const preloadLink =
+      document.createElement("link");
+
+    preloadLink.rel = "preload";
+    preloadLink.as = "video";
+    preloadLink.href = cloudinaryUrl;
+    preloadLink.setAttribute(
+      "data-video-preload",
+      cloudinaryUrl
+    );
+
+    document.head.appendChild(preloadLink);
+
+    return () => {
+      preloadLink.remove();
+    };
+  }, [priority, cloudinaryUrl]);
 
   // --------------------------------------------------
   // VIDEO METADATA
@@ -896,10 +1051,9 @@ function WorkCard({
             loop
             muted
             playsInline
-            preload={
-              priority
-                ? "auto"
-                : "metadata"
+            preload="auto"
+            fetchPriority={
+              priority ? "high" : "auto"
             }
             onLoadedMetadata={
               handleLoadedMetadata
@@ -924,6 +1078,11 @@ function WorkCard({
             src={posterUrl}
             alt=""
             aria-hidden="true"
+            loading={priority ? "eager" : "lazy"}
+            decoding="async"
+            fetchPriority={
+              priority ? "high" : "low"
+            }
             className="
               block
               w-full
@@ -1478,6 +1637,19 @@ export default function AllWorksSection() {
 
   const [selectedClient, setSelectedClient] =
     useState("ALL");
+
+  // --------------------------------------------------
+  // CLOUDINARY CONNECTION WARM-UP
+  // --------------------------------------------------
+  // Fires as soon as we know the CDN origin (first project loaded),
+  // well before any individual card's IntersectionObserver decides to
+  // start pulling a video.
+
+  useCloudinaryPreconnect(
+    typeof projects?.[0]?.heroVideos?.[0]?.src === "string"
+      ? projects[0].heroVideos[0].src
+      : null
+  );
 
   // --------------------------------------------------
   // DESKTOP HOVER CAPABILITY
@@ -2108,6 +2280,7 @@ export default function AllWorksSection() {
                     loop
                     playsInline
                     preload="auto"
+                    fetchPriority="high"
                     className="
                       absolute
                       inset-0
@@ -2262,7 +2435,7 @@ export default function AllWorksSection() {
                             project
                           }
                           priority={
-                            index < 2
+                            index < 3
                           }
                           heightClassName="w-full aspect-video"
                           onHoverChange={(

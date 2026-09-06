@@ -6,11 +6,151 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useRef } from "react";
 
+// ==========================================================
+// READINESS HELPERS
+// ==========================================================
+
+
+function elementInInitialViewport(el) {
+  const rect = el.getBoundingClientRect();
+
+  return rect.top < window.innerHeight && rect.bottom > 0;
+}
+
+// --------------------------------------------------------
+// FONTS
+// --------------------------------------------------------
+
+function waitForFonts() {
+  if (typeof document === "undefined" || !document.fonts) {
+    return Promise.resolve();
+  }
+
+  return document.fonts.ready.catch(() => {});
+}
+
+// --------------------------------------------------------
+// IMAGES
+// --------------------------------------------------------
+
+
+function waitForVisibleImages() {
+  const images = Array.from(document.images).filter((img) => {
+    const isEager = img.loading !== "lazy";
+    const isVisible = elementInInitialViewport(img);
+
+    return (isEager || isVisible) && !img.complete;
+  });
+
+  return Promise.all(
+    images.map(
+      (img) =>
+        new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+        })
+    )
+  );
+}
+
+// --------------------------------------------------------
+// VIDEO
+// --------------------------------------------------------
+
+
+function waitForVisibleVideos() {
+  const videos = Array.from(
+    document.querySelectorAll("video")
+  ).filter((video) => {
+    const hasSource = Boolean(video.currentSrc || video.src);
+    const isVisible = elementInInitialViewport(video);
+
+    return hasSource && isVisible && video.readyState < 2;
+  });
+
+  return Promise.all(
+    videos.map(
+      (video) =>
+        new Promise((resolve) => {
+          video.addEventListener("loadeddata", resolve, {
+            once: true,
+          });
+
+          video.addEventListener("error", resolve, {
+            once: true,
+          });
+        })
+    )
+  );
+}
+
+// --------------------------------------------------------
+// EXPLICIT "STILL LOADING" FLAGS
+// --------------------------------------------------------
+
+
+function waitForNoLoadingFlags(deadline) {
+  return new Promise((resolve) => {
+    const check = () => {
+      const stillLoading = document.querySelector(
+        '[aria-busy="true"], [data-page-loading="true"]'
+      );
+
+      if (!stillLoading || performance.now() > deadline) {
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(check);
+    };
+
+    check();
+  });
+}
+
+// --------------------------------------------------------
+// COMBINED "IS THE PAGE REALLY READY" CHECK
+// --------------------------------------------------------
+
+async function waitForPageFullyLoaded({ startTime, maxWaitMs }) {
+  const deadline = startTime + maxWaitMs;
+
+  const remaining = () =>
+    Math.max(0, deadline - performance.now());
+
+  const withDeadline = (promise) =>
+    Promise.race([
+      promise,
+      new Promise((resolve) => setTimeout(resolve, remaining())),
+    ]);
+
+  // Data-loading flags first — no point checking image/video
+  // readiness while the real content behind them hasn't rendered yet.
+  await withDeadline(waitForNoLoadingFlags(deadline));
+
+
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  await withDeadline(
+    Promise.all([
+      waitForFonts(),
+      waitForVisibleImages(),
+      waitForVisibleVideos(),
+    ])
+  );
+}
+
+// ==========================================================
+// TRANSITION LINK
+// ==========================================================
+
 export default function TransitionLink({
   href,
   children,
   className,
   onClick,
+  maxWaitMs = 8000,
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -75,8 +215,12 @@ export default function TransitionLink({
 
       router.push(href);
 
+      // Strip query/hash so this still matches on links like
+      // "/Work/slug?ref=list".
+      const targetPath = href.split(/[?#]/)[0];
+
       // =====================================================
-      // WAIT FOR NEW ROUTE
+      // WAIT FOR NEW ROUTE + REAL READINESS
       // =====================================================
 
       const startTime = performance.now();
@@ -86,10 +230,7 @@ export default function TransitionLink({
         // SAFETY FALLBACK
         // ---------------------------------------------------
 
-        if (
-          performance.now() - startTime >
-          4000
-        ) {
+        if (performance.now() - startTime > maxWaitMs) {
           finishTransition();
           return;
         }
@@ -98,26 +239,20 @@ export default function TransitionLink({
         // WAIT FOR ROUTE
         // ---------------------------------------------------
 
-        if (
-          window.location.pathname !==
-          href
-        ) {
-          requestAnimationFrame(
-            waitForPageReady
-          );
-
+        if (window.location.pathname !== targetPath) {
+          requestAnimationFrame(waitForPageReady);
           return;
         }
 
         // ---------------------------------------------------
-        // WAIT FOR REACT TO RENDER
+        // WAIT FOR REAL READINESS: fonts, in-view images/video,
+        // and any explicit data-loading flags on the new page.
         // ---------------------------------------------------
 
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            finishTransition();
-          });
-        });
+        waitForPageFullyLoaded({
+          startTime,
+          maxWaitMs,
+        }).then(finishTransition);
       };
 
       // =====================================================
@@ -144,8 +279,7 @@ export default function TransitionLink({
               opacity: 0,
             });
 
-            isTransitioning.current =
-              false;
+            isTransitioning.current = false;
 
             ScrollTrigger.refresh();
           },

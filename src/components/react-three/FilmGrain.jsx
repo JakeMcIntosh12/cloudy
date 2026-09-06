@@ -338,16 +338,9 @@ FULL VIEWPORT OVERLAY
     }}
 
     style={{
-      position: "absolute",
-      inset: 0,
-
-      width: "100%",
-      height: "100%",
-
-      display: "block",
-
-      pointerEvents: "none",
-    }}
+  pointerEvents: "none",
+  touchAction: "none",
+}}
   >
     <GrainPlane
       intensity={intensity}

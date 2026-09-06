@@ -557,7 +557,7 @@ export default function Page() {
             className="
               font-geist-mono
               font-medium
-              text-[clamp(0.4rem,1vw,0.85rem)]
+              text-[clamp(0.55rem,1vw,0.85rem)]
               text-zinc-400
               tracking-tight
               text-left

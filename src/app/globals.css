@@ -46,3 +46,8 @@
 *, ::before, ::after {
   box-sizing: border-box;
 }
+
+html, body {
+  overscroll-behavior-y: none; /* kills the rubber-band bounce */
+  height: 100%;
+}

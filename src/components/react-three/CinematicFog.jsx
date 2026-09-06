@@ -348,9 +348,9 @@ function RadialVaporRing() {
           position={[0, -5.8, -3.2]}
         >
           <Cloud
-            seed={103}
-            scale={3.6}
-            volume={16}
+            seed={101}
+            scale={3.2}
+            volume={14}
             color="#eeeeee"
             opacity={0.08}
             fade={90}
@@ -404,13 +404,9 @@ export default function GlobalCinematicFog() {
             stencil: false,
           }}
           style={{
-            position: "absolute",
-            inset: 0,
-            display: "block",
-            width: "100%",
-            height: "100%",
-            pointerEvents: "none",
-          }}
+  pointerEvents: "none",
+  touchAction: "none",
+}}
           events={() => ({
             enabled: false,
           })}
