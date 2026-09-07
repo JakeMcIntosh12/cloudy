@@ -10,6 +10,7 @@ import { useRef } from "react";
 // READINESS HELPERS
 // ==========================================================
 
+
 function elementInInitialViewport(el) {
   const rect = el.getBoundingClientRect();
 
@@ -17,37 +18,11 @@ function elementInInitialViewport(el) {
 }
 
 // --------------------------------------------------------
-// WAIT FOR BROWSER PAINT
-// --------------------------------------------------------
-
-function waitForPaintFrames(count = 2) {
-  return new Promise((resolve) => {
-    let frames = 0;
-
-    const nextFrame = () => {
-      frames += 1;
-
-      if (frames >= count) {
-        resolve();
-        return;
-      }
-
-      requestAnimationFrame(nextFrame);
-    };
-
-    requestAnimationFrame(nextFrame);
-  });
-}
-
-// --------------------------------------------------------
 // FONTS
 // --------------------------------------------------------
 
 function waitForFonts() {
-  if (
-    typeof document === "undefined" ||
-    !document.fonts
-  ) {
+  if (typeof document === "undefined" || !document.fonts) {
     return Promise.resolve();
   }
 
@@ -58,45 +33,21 @@ function waitForFonts() {
 // IMAGES
 // --------------------------------------------------------
 
-function waitForVisibleImages() {
-  if (typeof document === "undefined") {
-    return Promise.resolve();
-  }
 
+function waitForVisibleImages() {
   const images = Array.from(document.images).filter((img) => {
     const isEager = img.loading !== "lazy";
     const isVisible = elementInInitialViewport(img);
 
-    return (
-      (isEager || isVisible) &&
-      !img.complete
-    );
+    return (isEager || isVisible) && !img.complete;
   });
-
-  if (!images.length) {
-    return Promise.resolve();
-  }
 
   return Promise.all(
     images.map(
       (img) =>
         new Promise((resolve) => {
-          const done = () => resolve();
-
-          img.addEventListener(
-            "load",
-            done,
-            { once: true }
-          );
-
-          img.addEventListener(
-            "error",
-            done,
-            { once: true }
-          );
-
-          // Safety fallback.
-          setTimeout(done, 5000);
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
         })
     )
   );
@@ -106,52 +57,28 @@ function waitForVisibleImages() {
 // VIDEO
 // --------------------------------------------------------
 
-function waitForVisibleVideos() {
-  if (typeof document === "undefined") {
-    return Promise.resolve();
-  }
 
+function waitForVisibleVideos() {
   const videos = Array.from(
     document.querySelectorAll("video")
   ).filter((video) => {
-    const hasSource = Boolean(
-      video.currentSrc || video.src
-    );
+    const hasSource = Boolean(video.currentSrc || video.src);
+    const isVisible = elementInInitialViewport(video);
 
-    const isVisible =
-      elementInInitialViewport(video);
-
-    return (
-      hasSource &&
-      isVisible &&
-      video.readyState < 2
-    );
+    return hasSource && isVisible && video.readyState < 2;
   });
-
-  if (!videos.length) {
-    return Promise.resolve();
-  }
 
   return Promise.all(
     videos.map(
       (video) =>
         new Promise((resolve) => {
-          const done = () => resolve();
+          video.addEventListener("loadeddata", resolve, {
+            once: true,
+          });
 
-          video.addEventListener(
-            "loadeddata",
-            done,
-            { once: true }
-          );
-
-          video.addEventListener(
-            "error",
-            done,
-            { once: true }
-          );
-
-          // Safety fallback.
-          setTimeout(done, 5000);
+          video.addEventListener("error", resolve, {
+            once: true,
+          });
         })
     )
   );
@@ -161,18 +88,15 @@ function waitForVisibleVideos() {
 // EXPLICIT "STILL LOADING" FLAGS
 // --------------------------------------------------------
 
+
 function waitForNoLoadingFlags(deadline) {
   return new Promise((resolve) => {
     const check = () => {
-      const stillLoading =
-        document.querySelector(
-          '[aria-busy="true"], [data-page-loading="true"]'
-        );
+      const stillLoading = document.querySelector(
+        '[aria-busy="true"], [data-page-loading="true"]'
+      );
 
-      if (
-        !stillLoading ||
-        performance.now() > deadline
-      ) {
+      if (!stillLoading || performance.now() > deadline) {
         resolve();
         return;
       }
@@ -184,51 +108,29 @@ function waitForNoLoadingFlags(deadline) {
   });
 }
 
-// ==========================================================
-// COMBINED PAGE READINESS
-// ==========================================================
+// --------------------------------------------------------
+// COMBINED "IS THE PAGE REALLY READY" CHECK
+// --------------------------------------------------------
 
-async function waitForPageFullyLoaded({
-  startTime,
-  maxWaitMs,
-}) {
-  const deadline =
-    startTime + maxWaitMs;
+async function waitForPageFullyLoaded({ startTime, maxWaitMs }) {
+  const deadline = startTime + maxWaitMs;
 
   const remaining = () =>
-    Math.max(
-      0,
-      deadline - performance.now()
-    );
+    Math.max(0, deadline - performance.now());
 
   const withDeadline = (promise) =>
     Promise.race([
       promise,
-      new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          remaining()
-        )
-      ),
+      new Promise((resolve) => setTimeout(resolve, remaining())),
     ]);
 
-  // --------------------------------------------------------
-  // 1. WAIT FOR EXPLICIT PAGE LOADING FLAGS
-  // --------------------------------------------------------
+  // Data-loading flags first — no point checking image/video
+  // readiness while the real content behind them hasn't rendered yet.
+  await withDeadline(waitForNoLoadingFlags(deadline));
 
-  await withDeadline(
-    waitForNoLoadingFlags(deadline)
-  );
 
-  // --------------------------------------------------------
-  // 2. WAIT FOR DOM TO SETTLE
-  // --------------------------------------------------------
-
-  await waitForPaintFrames(2);
-
-  // --------------------------------------------------------
-  // 3. WAIT FOR FONTS / INITIAL IMAGES / VIDEOS
-  // --------------------------------------------------------
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
 
   await withDeadline(
     Promise.all([
@@ -237,13 +139,6 @@ async function waitForPageFullyLoaded({
       waitForVisibleVideos(),
     ])
   );
-
-  // --------------------------------------------------------
-  // 4. IMPORTANT:
-  // LET REACT + THREE.JS + THE BROWSER PAINT
-  // --------------------------------------------------------
-
-  await waitForPaintFrames(3);
 }
 
 // ==========================================================
@@ -260,40 +155,24 @@ export default function TransitionLink({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isTransitioning =
-    useRef(false);
+  const isTransitioning = useRef(false);
 
   const handleTransition = (e) => {
     e.preventDefault();
 
-    if (isTransitioning.current) {
-      return;
-    }
+    if (isTransitioning.current) return;
 
-    // ------------------------------------------------------
-    // CUSTOM CLICK HANDLER
-    // ------------------------------------------------------
-
+    // Run any custom click handler
     if (onClick) {
       onClick(e);
     }
 
-    // ------------------------------------------------------
-    // CURRENT PAGE
-    // ------------------------------------------------------
+    // Don't transition to the current page
+    if (href === pathname) return;
 
-    if (href === pathname) {
-      return;
-    }
-
-    const overlay =
-      document.querySelector(
-        ".page-transition-overlay"
-      );
-
-    // ------------------------------------------------------
-    // NO OVERLAY FALLBACK
-    // ------------------------------------------------------
+    const overlay = document.querySelector(
+      ".page-transition-overlay"
+    );
 
     if (!overlay) {
       window.scrollTo(0, 0);
@@ -303,9 +182,9 @@ export default function TransitionLink({
 
     isTransitioning.current = true;
 
-    // ======================================================
+    // =======================================================
     // RESET OVERLAY
-    // ======================================================
+    // =======================================================
 
     gsap.killTweensOf(overlay);
 
@@ -314,9 +193,9 @@ export default function TransitionLink({
       opacity: 0,
     });
 
-    // ======================================================
+    // =======================================================
     // WIPE IN
-    // ======================================================
+    // =======================================================
 
     const tl = gsap.timeline();
 
@@ -327,73 +206,61 @@ export default function TransitionLink({
       ease: "power4.inOut",
     });
 
-    // ======================================================
+    // =======================================================
     // NAVIGATE
-    // ======================================================
+    // =======================================================
 
     tl.call(() => {
       window.scrollTo(0, 0);
 
       router.push(href);
 
-      const targetPath =
-        href.split(/[?#]/)[0];
+      // Strip query/hash so this still matches on links like
+      // "/Work/slug?ref=list".
+      const targetPath = href.split(/[?#]/)[0];
 
-      const startTime =
-        performance.now();
+      // =====================================================
+      // WAIT FOR NEW ROUTE + REAL READINESS
+      // =====================================================
 
-      // ====================================================
-      // WAIT FOR NEW ROUTE
-      // ====================================================
+      const startTime = performance.now();
 
       const waitForPageReady = () => {
-        // --------------------------------------------------
+        // ---------------------------------------------------
         // SAFETY FALLBACK
-        // --------------------------------------------------
+        // ---------------------------------------------------
 
-        if (
-          performance.now() - startTime >
-          maxWaitMs
-        ) {
+        if (performance.now() - startTime > maxWaitMs) {
           finishTransition();
           return;
         }
 
-        // --------------------------------------------------
-        // WAIT UNTIL ROUTE HAS ACTUALLY CHANGED
-        // --------------------------------------------------
+        // ---------------------------------------------------
+        // WAIT FOR ROUTE
+        // ---------------------------------------------------
 
-        if (
-          window.location.pathname !==
-          targetPath
-        ) {
-          requestAnimationFrame(
-            waitForPageReady
-          );
-
+        if (window.location.pathname !== targetPath) {
+          requestAnimationFrame(waitForPageReady);
           return;
         }
 
-        // --------------------------------------------------
-        // WAIT FOR PAGE READINESS
-        // --------------------------------------------------
+        // ---------------------------------------------------
+        // WAIT FOR REAL READINESS: fonts, in-view images/video,
+        // and any explicit data-loading flags on the new page.
+        // ---------------------------------------------------
 
         waitForPageFullyLoaded({
           startTime,
           maxWaitMs,
-        }).then(() => {
-          finishTransition();
-        });
+        }).then(finishTransition);
       };
 
-      // ====================================================
+      // =====================================================
       // FINISH TRANSITION
-      // ====================================================
+      // =====================================================
 
       const finishTransition = () => {
-        if (
-          !isTransitioning.current
-        ) {
+        if (!isTransitioning.current) {
           return;
         }
 
@@ -412,8 +279,7 @@ export default function TransitionLink({
               opacity: 0,
             });
 
-            isTransitioning.current =
-              false;
+            isTransitioning.current = false;
 
             ScrollTrigger.refresh();
           },

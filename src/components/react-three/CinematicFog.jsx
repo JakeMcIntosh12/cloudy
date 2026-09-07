@@ -375,30 +375,19 @@ export default function GlobalCinematicFog() {
 
   return (
     <div
-      className="fixed inset-0 pointer-events-none z-40 overflow-hidden"
+      className="
+        fixed
+        inset-0
+        pointer-events-none
+        z-40
+        overflow-hidden
+      "
       style={{
-        position: "fixed",
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-
-        /*
-          Explicit viewport dimensions.
-
-          Do NOT use:
-          width: "100%"
-          height: "100%"
-
-          Those can behave inconsistently when the parent/root
-          dimensions have not settled on mobile.
-        */
-        width: "100vw",
-        height: "100vh",
-
+        width: "100%",
+        height: "100%",
+        minHeight: "100dvh",
         pointerEvents: "none",
         touchAction: "none",
-        overflow: "hidden",
       }}
     >
       <WebGLSceneErrorBoundary>
@@ -413,31 +402,15 @@ export default function GlobalCinematicFog() {
             antialias: false,
             alpha: true,
             stencil: false,
-            depth: false,
           }}
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            display: "block",
-            pointerEvents: "none",
-          }}
+  pointerEvents: "none",
+  touchAction: "none",
+}}
           events={() => ({
             enabled: false,
           })}
-          onCreated={({ scene, gl, size }) => {
-            /*
-              Make sure the renderer immediately has the
-              correct mobile viewport dimensions.
-            */
-            gl.setSize(
-              size.width,
-              size.height,
-              false
-            );
-
+          onCreated={({ scene }) => {
             scene.fog = new THREE.FogExp2(
               "#0a0c10",
               0.001
@@ -453,9 +426,9 @@ export default function GlobalCinematicFog() {
             intensity={1.1}
           />
 
-          
+          <Suspense fallback={null}>
             <RadialVaporRing />
-          
+          </Suspense>
         </Canvas>
       </WebGLSceneErrorBoundary>
     </div>
