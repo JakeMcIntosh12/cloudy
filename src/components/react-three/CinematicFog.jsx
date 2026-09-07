@@ -453,9 +453,9 @@ export default function GlobalCinematicFog() {
             intensity={1.1}
           />
 
-          <Suspense fallback={null}>
+          
             <RadialVaporRing />
-          </Suspense>
+          
         </Canvas>
       </WebGLSceneErrorBoundary>
     </div>
