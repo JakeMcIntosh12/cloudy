@@ -1,3 +1,4 @@
+
 "use client"
 
 import Controls from '@/components/UI/Controls'
@@ -123,71 +124,6 @@ function Home() {
   // Prevent the interaction guide from being triggered
   // more than once during the current component lifetime.
   const interactionGuideShownRef = useRef(false)
-
-  // =========================================================
-  // INTERACTION GUIDE VIDEO PRELOAD
-  // =========================================================
-  //
-  // IMPORTANT:
-  // The popup should NOT be the first time the browser
-  // discovers the guide video.
-  //
-  // We start requesting it immediately after mount so that
-  // by the time the popup appears, the browser has already
-  // downloaded as much of the video as possible.
-  //
-  // =========================================================
-
-  const interactionGuideVideoRef = useRef(null)
-
-  useEffect(() => {
-    if (
-      typeof window === 'undefined'
-    ) {
-      return
-    }
-
-    const video = document.createElement('video')
-
-    video.src = INTERACTION_GUIDE_VIDEO
-
-    video.preload = 'auto'
-
-    video.muted = true
-
-    video.playsInline = true
-
-    video.setAttribute(
-      'playsinline',
-      'true'
-    )
-
-    video.setAttribute(
-      'webkit-playsinline',
-      'true'
-    )
-
-    // Keep the element in memory so the browser continues
-    // loading the asset.
-    interactionGuideVideoRef.current = video
-
-    // Explicitly tell the browser to begin loading.
-    video.load()
-
-    return () => {
-      if (
-        interactionGuideVideoRef.current === video
-      ) {
-        interactionGuideVideoRef.current = null
-      }
-
-      video.pause()
-
-      video.removeAttribute('src')
-
-      video.load()
-    }
-  }, [])
 
   // =========================================================
   // FETCH HERO VIDEO FROM SANITY
@@ -998,18 +934,6 @@ function Home() {
 
   return (
     <>
-      {/* =====================================================
-          EARLY INTERACTION GUIDE VIDEO PRELOAD
-          ===================================================== */}
-
-      <link
-        rel="preload"
-        href={INTERACTION_GUIDE_VIDEO}
-        as="video"
-        type="video/mp4"
-        fetchPriority="high"
-      />
-
       {/* FIXED NAVIGATION */}
 
       <header className="fixed top-0 left-0 right-0 z-[90] p-4 w-full pointer-events-none">
@@ -1241,8 +1165,7 @@ function Home() {
                 muted
                 loop
                 playsInline
-                preload="auto"
-                fetchPriority="high"
+                preload="metadata"
                 className="absolute inset-0 w-full h-full object-cover"
               />
 
@@ -1296,3 +1219,4 @@ function Home() {
 }
 
 export default Home
+
