@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, {
@@ -176,7 +177,7 @@ function RadialVaporRing() {
        DOCUMENT PROGRESS
     ======================================================= */
 
-    const progress =
+    const rawProgress =
       THREE.MathUtils.clamp(
         scrollState.current /
           docHeightRef.current,
@@ -184,11 +185,18 @@ function RadialVaporRing() {
         1
       );
 
+    const progress =
+      THREE.MathUtils.smoothstep(
+        rawProgress,
+        0,
+        0.85
+      );
+
     /* =======================================================
        CONTROLLED CLOUD PULL
     ======================================================= */
 
-    const maxPull = 5.6;
+    const maxPull = 2.8;
 
     const targetDepth =
       progress * maxPull;
@@ -204,7 +212,7 @@ function RadialVaporRing() {
        CONTROLLED ZOOM
     ======================================================= */
 
-    const maxZoom = 1.56;
+    const maxZoom = 0.65;
 
     const zoom =
       progress * maxZoom;
@@ -404,9 +412,9 @@ export default function GlobalCinematicFog() {
             stencil: false,
           }}
           style={{
-  pointerEvents: "none",
-  touchAction: "none",
-}}
+            pointerEvents: "none",
+            touchAction: "none",
+          }}
           events={() => ({
             enabled: false,
           })}
@@ -434,3 +442,4 @@ export default function GlobalCinematicFog() {
     </div>
   );
 }
+

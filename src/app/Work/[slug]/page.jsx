@@ -1110,7 +1110,7 @@ export default function CloudhausWorkDetail() {
                     text-[clamp(0.5rem,1.5vw,0.75rem)]
                     uppercase
                     tracking-[0px]
-                    text-zinc-400
+                    text-zinc-100
                     leading-none
                     whitespace-nowrap
                   "
