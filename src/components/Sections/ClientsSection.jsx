@@ -24,27 +24,32 @@ function ClientsSection() {
     {
       name: "KRIVIC",
       src: KRIVICLogo,
-      logoClass: "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+      logoClass:
+        "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
     },
     {
       name: "Morgan Build",
       src: MorganBuildLogo,
-      logoClass: "w-[clamp(10rem,16vw,18rem)] h-[clamp(5rem,9vw,9rem)]",
+      logoClass:
+        "w-[clamp(10rem,16vw,18rem)] h-[clamp(5rem,9vw,9rem)]",
     },
     {
       name: "Circa",
       src: CircaLogo,
-      logoClass: "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+      logoClass:
+        "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
     },
     {
       name: "TBC",
       src: Client4Logo,
-      logoClass: "w-[clamp(9rem,13vw,14rem)] h-[clamp(5rem,8vw,8rem)]",
+      logoClass:
+        "w-[clamp(9rem,13vw,14rem)] h-[clamp(5rem,8vw,8rem)]",
     },
     {
       name: "4Life Constructions",
       src: Client5Logo,
-      logoClass: "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+      logoClass:
+        "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
     },
     {
       name: "NB",
@@ -53,6 +58,74 @@ function ClientsSection() {
         "w-[clamp(11rem,16vw,16rem)] h-[clamp(7rem,10vw,11rem)] scale-[1.35]",
     },
   ];
+
+  // =========================================================
+  // PRELOAD ALL LOGOS IMMEDIATELY
+  // =========================================================
+  //
+  // These logos are local SVG assets, so we can request them
+  // as soon as this component mounts rather than waiting for
+  // the section to enter the viewport.
+  //
+  // The browser will cache these requests, meaning when the
+  // actual <Image> elements render later, the assets should
+  // already be available.
+  //
+  // =========================================================
+
+  useEffect(() => {
+    const preloadLogos = clients
+      .map((client) => {
+        if (!client.src) return null;
+
+        const link = document.createElement("link");
+
+        link.rel = "preload";
+        link.as = "image";
+        link.href = client.src.src || client.src;
+
+        // SVG images don't need a fetch priority attribute in
+        // every browser, but this helps browsers that support it.
+        link.fetchPriority = "high";
+
+        document.head.appendChild(link);
+
+        return link;
+      })
+      .filter(Boolean);
+
+    // Also warm the browser's image cache directly.
+    const imagePreloads = clients
+      .map((client) => {
+        if (!client.src) return null;
+
+        const image = new window.Image();
+
+        image.decoding = "async";
+        image.fetchPriority = "high";
+        image.src = client.src.src || client.src;
+
+        return image;
+      })
+      .filter(Boolean);
+
+    return () => {
+      preloadLogos.forEach((link) => {
+        if (link.parentNode) {
+          link.parentNode.removeChild(link);
+        }
+      });
+
+      imagePreloads.forEach((image) => {
+        image.onload = null;
+        image.onerror = null;
+      });
+    };
+  }, []);
+
+  // =========================================================
+  // INFINITE CAROUSEL
+  // =========================================================
 
   useEffect(() => {
     const track = trackRef.current;
@@ -63,7 +136,7 @@ function ClientsSection() {
       const totalWidth = track.scrollWidth / 2;
 
       // =========================================================
-      // INFINITE CAROUSEL (Original GSAP Loop structure restored)
+      // INFINITE CAROUSEL
       // =========================================================
 
       const loop = gsap.to(items, {
@@ -79,7 +152,8 @@ function ClientsSection() {
         },
       });
 
-      // Wrap the timeline's progress continuously so playing in reverse never hits 0
+      // Wrap the timeline's progress continuously so playing
+      // in reverse never hits 0.
       loop.eventCallback("onUpdate", () => {
         if (loop.totalProgress() <= 0) {
           loop.totalProgress(loop.totalProgress() + 1);
@@ -169,7 +243,8 @@ function ClientsSection() {
 
         if (wheelRAFRef.current !== null) return;
 
-        wheelRAFRef.current = requestAnimationFrame(applyWheelEffect);
+        wheelRAFRef.current =
+          requestAnimationFrame(applyWheelEffect);
       };
 
       window.addEventListener("wheel", handleWheel, {
@@ -233,6 +308,10 @@ function ClientsSection() {
           src={client.src}
           alt={`${client.name} logo`}
           fill
+          priority
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
           sizes="(max-width: 768px) 45vw, 23rem"
           className="object-contain brightness-0 invert"
         />
@@ -241,12 +320,13 @@ function ClientsSection() {
   );
 
   return (
-    <div className="w-screen relative left-1/2 -translate-x-1/2  bg-black mt-[clamp(0.1rem,4vw,0.2rem)] overflow-hidden mb-10 md:mb-20 ">
+    <div className="w-screen relative left-1/2 -translate-x-1/2 bg-black mt-[clamp(0.1rem,4vw,0.2rem)] overflow-hidden mb-10 md:mb-20">
       {/* HEADER */}
 
       <div className="flex flex-row items-center justify-between w-full text-zinc-300 px-4 md:px-8 opacity-0">
         <div className="font-mono tracking-tight text-[clamp(0.5rem,0.8vw,0.725rem)] flex items-center gap-[clamp(0.35rem,0.6vw,0.6rem)]">
           <div className="w-[clamp(0.35rem,0.5vw,0.5rem)] h-[clamp(0.35rem,0.5vw,0.5rem)] bg-zinc-300" />
+
           <h1>CLIENTS</h1>
         </div>
 
@@ -257,7 +337,7 @@ function ClientsSection() {
 
       {/* CONTENT */}
 
-      <div className="flex flex-col space-y-[clamp(1.5rem,4vw,4.5rem)] mt-[clamp(1.5rem,3.5vw,1.5rem)] mb-10 md:mb-30 mt-10 md:mt-0 ">
+      <div className="flex flex-col space-y-[clamp(1.5rem,4vw,4.5rem)] mt-[clamp(1.5rem,3.5vw,1.5rem)] mb-10 md:mb-30 mt-10 md:mt-0">
         {/* TITLE */}
 
         <h1 className="text-[clamp(1.35rem,3.6vw,2.65rem)] font-sans tracking-tight text-ghost-white max-w-[clamp(18rem,80vw,40rem)] leading-tight px-4 md:px-8 font-medium">
@@ -279,11 +359,15 @@ function ClientsSection() {
           >
             {/* Original Set */}
 
-            {clients.map((client, i) => renderLogo(client, i, 1))}
+            {clients.map((client, i) =>
+              renderLogo(client, i, 1),
+            )}
 
             {/* Duplicated Set */}
 
-            {clients.map((client, i) => renderLogo(client, i, 2))}
+            {clients.map((client, i) =>
+              renderLogo(client, i, 2),
+            )}
           </div>
         </div>
       </div>
