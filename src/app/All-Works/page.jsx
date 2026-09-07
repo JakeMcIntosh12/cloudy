@@ -941,66 +941,19 @@ function WorkCard({
     );
 
   // --------------------------------------------------
-  // VIDEO LAZY LOADING
+  // LOAD ALL VIDEOS IMMEDIATELY
   // --------------------------------------------------
+  // Every rendered WorkCard now requests its video immediately.
+  // No IntersectionObserver is used here.
 
   useEffect(() => {
-    if (
-      !containerRef.current ||
-      !optimizedVideoUrl
-    ) {
+    if (!optimizedVideoUrl) {
       return;
     }
 
-    if (priority) {
-      loadVideo();
-      return;
-    }
-
-    if (
-      !(
-        "IntersectionObserver" in
-        window
-      )
-    ) {
-      loadVideo();
-      return;
-    }
-
-    const element =
-      containerRef.current;
-
-    const observer =
-      new IntersectionObserver(
-        (entries) => {
-          const entry =
-            entries[0];
-
-          if (
-            entry &&
-            entry.isIntersecting
-          ) {
-            loadVideo();
-
-            observer.disconnect();
-          }
-        },
-        {
-          rootMargin:
-            "600px 0px",
-
-          threshold: 0,
-        }
-      );
-
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
+    loadVideo();
   }, [
     optimizedVideoUrl,
-    priority,
     loadVideo,
   ]);
 
@@ -1036,7 +989,8 @@ function WorkCard({
     preloadLink.rel =
       "preload";
 
-    preloadLink.as = "video";
+    preloadLink.as =
+      "video";
 
     preloadLink.href =
       optimizedVideoUrl;
@@ -1340,11 +1294,7 @@ function WorkCard({
             muted
             playsInline
             preload="auto"
-            fetchPriority={
-              priority
-                ? "high"
-                : "auto"
-            }
+            fetchPriority="auto"
             onError={
               handleVideoError
             }
@@ -2809,9 +2759,7 @@ export default function AllWorksSection() {
                           video={
                             project
                           }
-                          priority={
-                            index < 3
-                          }
+                          priority
                           heightClassName="w-full aspect-video"
                           onHoverChange={(
                             isHovered,
