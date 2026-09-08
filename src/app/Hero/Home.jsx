@@ -1,4 +1,3 @@
-
 "use client"
 
 import Controls from '@/components/UI/Controls'
@@ -961,7 +960,7 @@ function Home() {
           ref={
             preloaderRef
           }
-          className="fixed inset-0 w-full h-dvh bg-carbon-black z-[100] pointer-events-auto text-ghost-white flex flex-col items-center justify-between tracking-tight"
+          className="fixed inset-0 w-full h-dvh bg-black z-[100] pointer-events-auto text-ghost-white flex flex-col items-center justify-between tracking-tight"
         >
           <div className="w-full bg-zinc-900 h-[4px] relative overflow-hidden">
             <div
@@ -979,12 +978,12 @@ function Home() {
             ref={
               counterRef
             }
-            className="tracking-tight font-geist-mono text-[clamp(0.8rem,4vw,2rem)]"
+            className="tracking-tight font-sans font-medium text-[clamp(0.65rem,4vw,1.3rem)]"
           >
-            [ {String(progress).padStart(3, '0')}% ]
+            LOADING {String(progress).padStart(3, '0')}%
           </h1>
 
-          <p className="font-geist-mono text-ghost-white p-4 text-sm text-zinc-500">
+          <p className="font-geist-mono text-ghost-white p-4 text-xs md:text-sm text-zinc-600">
             IT ALL STARTS WITH AN IDEA
           </p>
         </div>
@@ -1219,4 +1218,3 @@ function Home() {
 }
 
 export default Home
-

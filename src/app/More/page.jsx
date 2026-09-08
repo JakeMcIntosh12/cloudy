@@ -439,6 +439,10 @@ const normalizeProject = (
 // 4. WORK CARD COMPONENT
 // ----------------------------------------------------------------------
 
+// ----------------------------------------------------------------------
+// 4. WORK CARD COMPONENT
+// ----------------------------------------------------------------------
+
 function WorkCard({
   video,
   containerClassName,
@@ -544,10 +548,16 @@ function WorkCard({
         }
       );
 
+      // ------------------------------------------------
+      // PLAY VIDEO ON HOVER
+      // ------------------------------------------------
+
       if (
         videoRef.current
       ) {
-        videoRef.current.pause();
+        videoRef.current
+          .play()
+          .catch(() => {});
       }
 
       if (
@@ -648,12 +658,14 @@ function WorkCard({
         ease: "power4.inOut",
       });
 
+      // ------------------------------------------------
+      // PAUSE VIDEO WHEN LEAVING
+      // ------------------------------------------------
+
       if (
         videoRef.current
       ) {
-        videoRef.current
-          .play()
-          .catch(() => {});
+        videoRef.current.pause();
       }
     };
 
@@ -704,7 +716,6 @@ function WorkCard({
           <video
             ref={videoRef}
             src={video.url}
-            autoPlay
             loop
             muted
             playsInline

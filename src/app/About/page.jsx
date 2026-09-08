@@ -428,9 +428,9 @@ export default function Page() {
                   <p>ADELAIDE, SOUTH AUSTRALIA</p>
                   <a
                     className="hover:text-zinc-600 hover:font-medium transition trransition-all duration-500"
-                    href="mailto:hello@cloudhaus.com"
+                    href="mailto:hello@cloudhausmedia.com"
                   >
-                    hello@cloudhaus.com
+                    hello@cloudhausmedia.com
                   </a>
                 </div>
               </div>

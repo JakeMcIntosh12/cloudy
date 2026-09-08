@@ -52,18 +52,23 @@ const WEDDINGS_QUERY = groq`
 
 const getMediaUrl = (media) => {
   if (!media) return null;
+
   if (typeof media === "string") {
     return media;
   }
+
   if (typeof media.url === "string") {
     return media.url;
   }
+
   if (typeof media.src === "string") {
     return media.src;
   }
+
   if (media.asset?.url) {
     return media.asset.url;
   }
+
   return null;
 };
 
@@ -76,6 +81,7 @@ const noiseShaderDefinition = {
     uTime: { value: 0 },
     uOpacity: { value: 0 },
   },
+
   vertexShader: `
     varying vec2 vUv;
 
@@ -84,6 +90,7 @@ const noiseShaderDefinition = {
       gl_Position = vec4(position, 1.0);
     }
   `,
+
   fragmentShader: `
     uniform float uTime;
     uniform float uOpacity;
@@ -134,8 +141,10 @@ function TVNoisePlane({ opacityRef }) {
           uTime: { value: 0 },
           uOpacity: { value: 0 },
         },
+
         vertexShader: noiseShaderDefinition.vertexShader,
         fragmentShader: noiseShaderDefinition.fragmentShader,
+
         transparent: true,
         depthTest: false,
         depthWrite: false,
@@ -244,7 +253,7 @@ const SmallButton = forwardRef(({ isOpen = false }, ref) => {
       className={`font-mono tracking-tight text-[clamp(0.6875rem,0.9vw,0.75rem)] border transition-colors duration-300 rounded-full w-[clamp(6.5rem,10vw,6.6875rem)] h-[clamp(1.75rem,2.5vw,2rem)] px-3 py-1 flex items-center justify-center text-center cursor-pointer select-none ${
         isOpen
           ? "bg-ghost-white text-carbon-black border-ghost-white hover:bg-zinc-300"
-          : "bg-carbon-black text-ghost-white border-eclipse hover:bg-ghost-white hover:text-carbon-black hover:border-ghost-white"
+          : "bg-carbon-black text-ghost-white border-eclipse hover:bg-carbon-black hover:text-ghost-white hover:border-eclipse"
       }`}
     >
       {isOpen ? "CLOSE" : "WATCH FILM"}
@@ -331,7 +340,7 @@ function WorkCard({
     });
 
     if (videoRef.current) {
-      videoRef.current.pause();
+      videoRef.current.play().catch(() => {});
     }
 
     if (buttonRef.current?.triggerBlur) {
@@ -346,10 +355,13 @@ function WorkCard({
 
     const topL =
       containerRef.current.querySelector(".corner-tl");
+
     const topR =
       containerRef.current.querySelector(".corner-tr");
+
     const botL =
       containerRef.current.querySelector(".corner-bl");
+
     const botR =
       containerRef.current.querySelector(".corner-br");
 
@@ -394,7 +406,7 @@ function WorkCard({
     });
 
     if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
+      videoRef.current.pause();
     }
   };
 
@@ -408,6 +420,7 @@ function WorkCard({
       }`}
     >
       {/* DATE / TIME */}
+
       <div className="flex flex-row items-center justify-between w-full px-1">
         <h1 className="font-geist-mono tracking-tight text-[clamp(0.6875rem,0.9vw,0.75rem)] text-zinc-500">
           {wedding.year || "—"}
@@ -419,6 +432,7 @@ function WorkCard({
       </div>
 
       {/* VIDEO */}
+
       <div
         ref={containerRef}
         onMouseEnter={handleMouseEnter}
@@ -430,7 +444,6 @@ function WorkCard({
         <video
           ref={videoRef}
           src={previewUrl}
-          autoPlay
           loop
           muted
           playsInline
@@ -445,6 +458,7 @@ function WorkCard({
         <R3FTVNoise ref={noiseRef} />
 
         {/* CORNER BRACKETS */}
+
         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
           <div className="corner-tl absolute top-4 left-4 w-8 h-8 border-t border-l border-white opacity-0 scale-90 -translate-x-3 -translate-y-3 mix-blend-difference" />
 
@@ -457,6 +471,7 @@ function WorkCard({
       </div>
 
       {/* WEDDING INFO */}
+
       <div className="flex flex-row items-baseline justify-between w-full px-1 pt-2 text-ghost-white">
         <div className="flex flex-col">
           <SmudgyTitleReveal
@@ -542,6 +557,7 @@ function ListItemRow({
   }, [onHoverEnd]);
 
   /* MOBILE SCROLL ACTIVATION */
+
   useEffect(() => {
     const mm = gsap.matchMedia();
 
@@ -572,6 +588,7 @@ function ListItemRow({
     >
       <div className="relative grid grid-cols-2 items-center py-4 px-2">
         {/* COUPLE */}
+
         <span
           ref={titleRef}
           className="font-serif text-sm md:text-xl font-light uppercase text-ghost-white inline-block"
@@ -580,6 +597,7 @@ function ListItemRow({
         </span>
 
         {/* YEAR */}
+
         <span
           ref={yearRef}
           className="font-geist-mono text-sm md:text-base text-right text-zinc-500 inline-block"
@@ -614,12 +632,15 @@ export default function WeddingsSection() {
     useState(false);
 
   /* VIDEO PLAYER STATE */
+
   const [selectedWedding, setSelectedWedding] =
     useState(null);
+
   const [isPlayerOpen, setIsPlayerOpen] =
     useState(false);
 
   /* FETCH WEDDINGS */
+
   useEffect(() => {
     let cancelled = false;
 
@@ -644,6 +665,7 @@ export default function WeddingsSection() {
           ? data
               .map((wedding) => ({
                 ...wedding,
+
                 videos: Array.isArray(wedding.videos)
                   ? wedding.videos
                       .slice(0, 5)
@@ -670,6 +692,7 @@ export default function WeddingsSection() {
 
         if (!cancelled) {
           setWeddings([]);
+
           setFetchError(
             "Unable to load weddings."
           );
@@ -689,6 +712,7 @@ export default function WeddingsSection() {
   }, []);
 
   /* INTRO SPLIT TEXT REVEAL */
+
   useLayoutEffect(() => {
     if (!introRef.current) return;
 
@@ -727,6 +751,7 @@ export default function WeddingsSection() {
         duration: 0.9,
         stagger: 0.08,
         ease: "power4.out",
+
         scrollTrigger: {
           trigger: introRef.current,
           start: "top 80%",
@@ -768,6 +793,7 @@ export default function WeddingsSection() {
         y: 10,
         duration: 0.25,
         ease: "power2.in",
+
         onComplete: () => {
           setViewMode(mode);
 
@@ -831,6 +857,7 @@ export default function WeddingsSection() {
   ]);
 
   /* LIST STAGGER */
+
   useEffect(() => {
     if (
       viewMode !== "list" ||
@@ -857,6 +884,7 @@ export default function WeddingsSection() {
           duration: 0.6,
           stagger: 0.08,
           ease: "power3.out",
+
           scrollTrigger: {
             trigger:
               listContainerRef.current,
@@ -875,6 +903,7 @@ export default function WeddingsSection() {
   ]);
 
   /* CURSOR & PREVIEW TRACKING */
+
   useEffect(() => {
     const cursor = cursorRef.current;
     const preview =
@@ -978,6 +1007,7 @@ export default function WeddingsSection() {
   }, [viewMode]);
 
   /* CURSOR VISIBILITY */
+
   useEffect(() => {
     const cursor =
       cursorRef.current;
@@ -988,13 +1018,16 @@ export default function WeddingsSection() {
       scale: isHoveringVideo
         ? 1
         : 0,
+
       opacity: isHoveringVideo
         ? 1
         : 0,
+
       duration:
         isHoveringVideo
           ? 0.25
           : 0.2,
+
       ease: isHoveringVideo
         ? "power2.out"
         : "power2.in",
@@ -1004,6 +1037,7 @@ export default function WeddingsSection() {
   ]);
 
   /* PLAY VIDEO TAG */
+
   useEffect(() => {
     const preview =
       listPreviewRef.current;
@@ -1030,6 +1064,7 @@ export default function WeddingsSection() {
   ]);
 
   /* VIDEO HOVER */
+
   const handleHoverChange =
     useCallback(
       (isHovered) => {
@@ -1041,9 +1076,11 @@ export default function WeddingsSection() {
     );
 
   /* LENIS */
+
   useEffect(() => {
     const lenis = new Lenis({
       duration: 1.2,
+
       easing: (t) =>
         Math.min(
           1,
@@ -1053,6 +1090,7 @@ export default function WeddingsSection() {
               -10 * t
             )
         ),
+
       smoothWheel: true,
       touchMultiplier: 2,
     });
@@ -1061,6 +1099,7 @@ export default function WeddingsSection() {
 
     function raf(time) {
       lenis.raf(time);
+
       frameId =
         requestAnimationFrame(
           raf
@@ -1074,6 +1113,7 @@ export default function WeddingsSection() {
       cancelAnimationFrame(
         frameId
       );
+
       lenis.destroy();
     };
   }, []);
@@ -1134,9 +1174,11 @@ export default function WeddingsSection() {
         </div>
 
         {/* NAVIGATION */}
+
         <Navigation />
 
         {/* INTRO */}
+
         <div className="flex w-full min-h-[55vh] items-center justify-start px-2 pt-10 md:pt-20">
           <h1
             ref={introRef}
@@ -1147,6 +1189,7 @@ export default function WeddingsSection() {
         </div>
 
         {/* CUSTOM CURSOR */}
+
         <div
           ref={cursorRef}
           className="fixed top-0 left-0 pointer-events-none z-[100] hidden md:block scale-0 opacity-0 mix-blend-difference text-white"
@@ -1157,6 +1200,7 @@ export default function WeddingsSection() {
         </div>
 
         {/* FLOATING PLAY TAG */}
+
         <div
           ref={listPreviewRef}
           className="fixed top-0 left-0 pointer-events-none z-[100] hidden scale-85 opacity-0"
@@ -1167,6 +1211,7 @@ export default function WeddingsSection() {
         </div>
 
         {/* HEADER */}
+
         <div className="relative z-10 flex flex-col space-y-6 pt-14 md:pt-10 lg:pt-30">
           <div className="flex flex-row items-center justify-between w-full text-zinc-300">
             <div className="opacity-0 font-geist-mono font-medium tracking-tight text-[clamp(0.5rem,0.8vw,0.625rem)] flex items-center gap-2">
@@ -1181,6 +1226,7 @@ export default function WeddingsSection() {
           </div>
 
           {/* WORKS HEADER */}
+
           <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between w-full text-ghost-white gap-6 sm:gap-0 pb-6">
             <div className="flex flex-row items-start gap-4 sm:gap-6 font-monot">
               <h1 className="text-[clamp(5rem,15vw,16.875rem)] tracking-[-8%] font-light leading-none uppercase">
@@ -1238,6 +1284,7 @@ export default function WeddingsSection() {
           </div>
 
           {/* CONTENT */}
+
           <div
             ref={containerRef}
             className="w-full transition-all duration-300"
@@ -1262,8 +1309,10 @@ export default function WeddingsSection() {
             ) : viewMode ===
               "grid" ? (
               /* 5-VIDEO EDITORIAL GRID */
+
               <div className="flex flex-col space-y-8 lg:space-y-58 pt-6">
                 {/* VIDEO 01 + VIDEO 02 */}
+
                 {activeProjects.length >=
                   2 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-8 lg:gap-0 text-lavender">
@@ -1296,6 +1345,7 @@ export default function WeddingsSection() {
                 )}
 
                 {/* VIDEO 03 — FEATURED / FULL WIDTH */}
+
                 {activeProjects.length >=
                   3 && (
                   <WorkCard
@@ -1313,6 +1363,7 @@ export default function WeddingsSection() {
                 )}
 
                 {/* VIDEO 04 + VIDEO 05 — ASYMMETRIC */}
+
                 {activeProjects.length >=
                   5 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-8 lg:gap-12 text-lavender pb-12 lg:pb-24 items-start">
@@ -1346,6 +1397,7 @@ export default function WeddingsSection() {
                 )}
 
                 {/* REMAINING WEDDINGS */}
+
                 {activeProjects.length >
                   5 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-8 lg:gap-12 text-lavender">
@@ -1377,6 +1429,7 @@ export default function WeddingsSection() {
               </div>
             ) : (
               /* LIST VIEW */
+
               <div
                 ref={
                   listContainerRef
@@ -1384,6 +1437,7 @@ export default function WeddingsSection() {
                 className="relative w-full pt-8 pb-16"
               >
                 {/* TABLE HEADER */}
+
                 <div className="grid grid-cols-2 items-center text-zinc-500 font-geist-mono text-xs uppercase tracking-wider pb-4 border-b border-zinc-800">
                   <span className="text-left">
                     COUPLE
@@ -1395,6 +1449,7 @@ export default function WeddingsSection() {
                 </div>
 
                 {/* LIST ROWS */}
+
                 <div className="flex flex-col divide-y divide-zinc-800/60">
                   {activeProjects.map(
                     (wedding) => (
@@ -1422,6 +1477,7 @@ export default function WeddingsSection() {
                 </div>
 
                 {/* LOAD MORE */}
+
                 {visibleCount <
                   weddings.length && (
                   <div className="flex justify-center pt-12">

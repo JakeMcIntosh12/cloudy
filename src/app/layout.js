@@ -66,6 +66,14 @@ export const metadata = {
     siteName: "Cloudhaus",
     locale: "en_AU",
     type: "website",
+    images: [
+    {
+      url: "/Images/horizontal.png",
+      width: 1200,
+      height: 630,
+      alt: "Cloudhaus — Architectural & Construction Photography & Film",
+    },
+  ],
   },
 
   twitter: {

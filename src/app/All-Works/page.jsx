@@ -68,14 +68,6 @@ const WORKS_QUERY = groq`
 // ----------------------------------------------------------------------
 // HERO VIDEO URL RESOLVER
 // ----------------------------------------------------------------------
-// IMPORTANT:
-// Do not assume heroVideos[0] is the usable video.
-//
-// A project can contain multiple heroVideos entries and one of them
-// may be empty/misconfigured while another one contains the actual video.
-//
-// This helper searches through every heroVideos entry and returns the
-// first valid URL it can find.
 
 function getHeroVideoUrl(project) {
   const videos = Array.isArray(
@@ -853,8 +845,6 @@ function WorkCard({
   // --------------------------------------------------
   // RESOLVE HERO VIDEO
   // --------------------------------------------------
-  // IMPORTANT:
-  // Searches every heroVideos entry instead of assuming [0].
 
   const rawUrl = useMemo(
     () =>
@@ -862,14 +852,10 @@ function WorkCard({
     [video]
   );
 
-  // Smaller source width on mobile.
-
   const videoWidth =
     isMobile
       ? 640
       : 960;
-
-  // Only transform Cloudinary URLs.
 
   const optimizedVideoUrl =
     useMemo(
@@ -941,23 +927,6 @@ function WorkCard({
     );
 
   // --------------------------------------------------
-  // LOAD ALL VIDEOS IMMEDIATELY
-  // --------------------------------------------------
-  // Every rendered WorkCard now requests its video immediately.
-  // No IntersectionObserver is used here.
-
-  useEffect(() => {
-    if (!optimizedVideoUrl) {
-      return;
-    }
-
-    loadVideo();
-  }, [
-    optimizedVideoUrl,
-    loadVideo,
-  ]);
-
-  // --------------------------------------------------
   // PRIORITY VIDEO PRELOAD HINT
   // --------------------------------------------------
 
@@ -1015,8 +984,6 @@ function WorkCard({
   // --------------------------------------------------
   // VIDEO ERROR FALLBACK
   // --------------------------------------------------
-  // If a transformed Cloudinary URL fails, retry using the original
-  // URL. This does not affect Sanity URLs because they are already raw.
 
   const handleVideoError =
     useCallback(() => {
@@ -1122,7 +1089,9 @@ function WorkCard({
       });
 
       if (videoRef.current) {
-        videoRef.current.pause();
+        videoRef.current
+          .play()
+          .catch(() => {});
       }
 
       buttonRef.current?.triggerBlur?.();
@@ -1140,6 +1109,12 @@ function WorkCard({
         video,
         videoUrl
       );
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.pause();
+      }
 
       if (
         !containerRef.current
@@ -1210,13 +1185,22 @@ function WorkCard({
         overwrite:
           "auto",
       });
-
-      if (videoRef.current) {
-        videoRef.current
-          .play()
-          .catch(() => {});
-      }
     };
+
+  // --------------------------------------------------
+  // LOAD ALL VIDEOS IMMEDIATELY
+  // --------------------------------------------------
+
+  useEffect(() => {
+    if (!optimizedVideoUrl) {
+      return;
+    }
+
+    loadVideo();
+  }, [
+    optimizedVideoUrl,
+    loadVideo,
+  ]);
 
   if (!video) {
     return null;
@@ -1289,11 +1273,10 @@ function WorkCard({
               posterUrl ||
               undefined
             }
-            autoPlay
             loop
             muted
             playsInline
-            preload="auto"
+            preload="metadata"
             fetchPriority="auto"
             onError={
               handleVideoError
@@ -1314,8 +1297,6 @@ function WorkCard({
             "
           />
         ) : posterUrl ? (
-          // Poster-only placeholder while video hasn't been requested.
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={posterUrl}
             alt=""
@@ -1587,10 +1568,6 @@ function ClientFilter({
   const optionItemsRef =
     useRef([]);
 
-  // --------------------------------------------------
-  // INITIAL STATE
-  // --------------------------------------------------
-
   useEffect(() => {
     if (!optionsRef.current) {
       return;
@@ -1615,10 +1592,6 @@ function ClientFilter({
       x: -18,
     });
   }, [clientFilters]);
-
-  // --------------------------------------------------
-  // OPEN
-  // --------------------------------------------------
 
   const openFilter =
     useCallback(() => {
@@ -1673,10 +1646,6 @@ function ClientFilter({
       );
     }, [clientFilters]);
 
-  // --------------------------------------------------
-  // CLOSE
-  // --------------------------------------------------
-
   const closeFilter =
     useCallback(() => {
       if (
@@ -1723,10 +1692,6 @@ function ClientFilter({
       );
     }, []);
 
-  // --------------------------------------------------
-  // MOBILE TAP
-  // --------------------------------------------------
-
   const handleFilterClick =
     () => {
       if (
@@ -1739,10 +1704,6 @@ function ClientFilter({
         }
       }
     };
-
-  // --------------------------------------------------
-  // HOVER
-  // --------------------------------------------------
 
   const handleMouseEnter =
     () => {
@@ -1773,8 +1734,6 @@ function ClientFilter({
         handleMouseLeave
       }
     >
-      {/* FILTER LABEL */}
-
       <button
         type="button"
         onClick={
@@ -1784,8 +1743,6 @@ function ClientFilter({
       >
         FILTER
       </button>
-
-      {/* OPTIONS */}
 
       <div
         ref={optionsRef}
@@ -1929,11 +1886,6 @@ export default function AllWorksSection() {
     setSelectedClient,
   ] = useState("ALL");
 
-  // --------------------------------------------------
-  // CLOUDINARY CONNECTION WARM-UP
-  // --------------------------------------------------
-  // Resolve the actual hero video rather than assuming heroVideos[0].
-
   const firstProjectVideo =
     useMemo(
       () =>
@@ -1946,10 +1898,6 @@ export default function AllWorksSection() {
   useCloudinaryPreconnect(
     firstProjectVideo
   );
-
-  // --------------------------------------------------
-  // DESKTOP HOVER CAPABILITY
-  // --------------------------------------------------
 
   const [canHover, setCanHover] =
     useState(false);
@@ -2005,10 +1953,6 @@ export default function AllWorksSection() {
     };
   }, []);
 
-  // --------------------------------------------------
-  // FETCH PROJECTS
-  // --------------------------------------------------
-
   useEffect(() => {
     let cancelled = false;
 
@@ -2062,10 +2006,6 @@ export default function AllWorksSection() {
     };
   }, []);
 
-  // --------------------------------------------------
-  // CLIENT FILTERS
-  // --------------------------------------------------
-
   const clientFilters =
     useMemo(() => {
       const clientCounts = {};
@@ -2114,10 +2054,6 @@ export default function AllWorksSection() {
         );
     }, [projects]);
 
-  // --------------------------------------------------
-  // FILTERED PROJECTS
-  // --------------------------------------------------
-
   const filteredProjects =
     useMemo(() => {
       if (
@@ -2141,10 +2077,6 @@ export default function AllWorksSection() {
       selectedClient,
     ]);
 
-  // --------------------------------------------------
-  // VISIBLE PROJECTS
-  // --------------------------------------------------
-
   const activeProjects =
     useMemo(() => {
       return filteredProjects.slice(
@@ -2156,17 +2088,9 @@ export default function AllWorksSection() {
       visibleCount,
     ]);
 
-  // --------------------------------------------------
-  // RESET VISIBLE COUNT
-  // --------------------------------------------------
-
   useEffect(() => {
     setVisibleCount(13);
   }, [selectedClient]);
-
-  // --------------------------------------------------
-  // LANDING STAGGER REVEAL
-  // --------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2217,10 +2141,6 @@ export default function AllWorksSection() {
     selectedClient,
   ]);
 
-  // --------------------------------------------------
-  // VIEW TOGGLE
-  // --------------------------------------------------
-
   const handleToggleView =
     (mode) => {
       if (
@@ -2259,10 +2179,6 @@ export default function AllWorksSection() {
         setViewMode(mode);
       }
     };
-
-  // --------------------------------------------------
-  // CLIENT FILTER
-  // --------------------------------------------------
 
   const handleClientFilter =
     (clientName) => {
@@ -2308,10 +2224,6 @@ export default function AllWorksSection() {
       }
     };
 
-  // --------------------------------------------------
-  // LOAD MORE
-  // --------------------------------------------------
-
   const handleLoadMore =
     () => {
       setVisibleCount(
@@ -2322,10 +2234,6 @@ export default function AllWorksSection() {
           )
       );
     };
-
-  // --------------------------------------------------
-  // REFRESH SCROLLTRIGGER
-  // --------------------------------------------------
 
   useEffect(() => {
     const timer =
@@ -2341,10 +2249,6 @@ export default function AllWorksSection() {
     activeProjects,
     selectedClient,
   ]);
-
-  // --------------------------------------------------
-  // HOVERED PROJECT
-  // --------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2372,8 +2276,6 @@ export default function AllWorksSection() {
       return;
     }
 
-    // IMPORTANT:
-    // Resolve from every heroVideos entry.
     const rawSource =
       getHeroVideoUrl(
         displayProject
@@ -2419,10 +2321,6 @@ export default function AllWorksSection() {
     viewMode,
     canHover,
   ]);
-
-  // --------------------------------------------------
-  // LIST STAGGER
-  // --------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2479,10 +2377,6 @@ export default function AllWorksSection() {
     selectedClient,
   ]);
 
-  // --------------------------------------------------
-  // LENIS
-  // --------------------------------------------------
-
   useEffect(() => {
     const lenis =
       new Lenis({
@@ -2527,10 +2421,6 @@ export default function AllWorksSection() {
     };
   }, []);
 
-  // --------------------------------------------------
-  // LOADING
-  // --------------------------------------------------
-
   if (isLoading) {
     return (
       <div className="bg-black w-full min-h-screen flex items-center justify-center">
@@ -2539,14 +2429,8 @@ export default function AllWorksSection() {
     );
   }
 
-  // --------------------------------------------------
-  // RENDER
-  // --------------------------------------------------
-
   return (
     <div className="bg-black w-full min-h-screen px-4 py-6 md:px-4 md:pt-22 relative overflow-x-hidden">
-      {/* SHARED TV NOISE */}
-
       <SharedTVNoise
         ref={noiseRef}
       />
@@ -2575,8 +2459,6 @@ export default function AllWorksSection() {
           {displayProject && (
             <>
               {(() => {
-                // IMPORTANT:
-                // Do not use displayProject.heroVideos[0].
                 const rawSource =
                   getHeroVideoUrl(
                     displayProject
@@ -2622,15 +2504,9 @@ export default function AllWorksSection() {
         </div>
       )}
 
-      {/* NAVIGATION */}
-
       <Navigation />
 
-      {/* HEADER */}
-
       <div className="relative z-10 flex flex-col space-y-6 pt-14 md:pt-8 lg:pt-20">
-        {/* TOP BAR */}
-
         <div className="flex flex-row items-center justify-between w-full text-zinc-300">
           <div className="opacity-0 font-geist-mono font-medium tracking-tight text-[clamp(0.5rem,0.8vw,0.625rem)] flex items-center gap-2">
             <div className="w-2 h-2 bg-zinc-300" />
@@ -2644,8 +2520,6 @@ export default function AllWorksSection() {
             [CLOUD_9]
           </h1>
         </div>
-
-        {/* TITLE / CONTROLS */}
 
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between w-full text-ghost-white gap-6 sm:gap-0 pb-6">
           <div className="flex flex-row items-start gap-4 sm:gap-6">
@@ -2664,8 +2538,6 @@ export default function AllWorksSection() {
           </div>
 
           <div className="flex flex-col items-start sm:items-end justify-end space-y-4 w-full sm:w-auto">
-            {/* GRID / LIST */}
-
             <div className="flex items-center space-x-3 font-geist-mono text-sm md:text-lg tracking-widest uppercase">
               <button
                 onClick={() =>
@@ -2712,8 +2584,6 @@ export default function AllWorksSection() {
               </button>
             </div>
 
-            {/* CLIENT FILTER */}
-
             {clientFilters.length >
               0 && (
               <ClientFilter
@@ -2731,8 +2601,6 @@ export default function AllWorksSection() {
           </div>
         </div>
 
-        {/* CONTENT */}
-
         <div
           ref={containerRef}
           className="w-full transition-all duration-300"
@@ -2740,8 +2608,6 @@ export default function AllWorksSection() {
           {viewMode ===
           "grid" ? (
             <div className="flex flex-col space-y-8 lg:space-y-14 pt-4">
-              {/* FIRST 3 PROJECTS */}
-
               {activeProjects.length >
                 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-12 text-lavender">
@@ -2793,8 +2659,6 @@ export default function AllWorksSection() {
                 </div>
               )}
 
-              {/* FOURTH PROJECT */}
-
               {activeProjects.length >=
                 4 && (
                 <div className="w-full">
@@ -2833,8 +2697,6 @@ export default function AllWorksSection() {
                   />
                 </div>
               )}
-
-              {/* PROJECTS 5 + 6 */}
 
               {activeProjects.length >=
                 5 && (
@@ -2914,8 +2776,6 @@ export default function AllWorksSection() {
                 </div>
               )}
 
-              {/* PROJECTS 7 + 8 */}
-
               {activeProjects.length >=
                 7 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-6 text-lavender md:pt-30">
@@ -2990,8 +2850,6 @@ export default function AllWorksSection() {
                 </div>
               )}
 
-              {/* PROJECTS 9 - 11 */}
-
               {activeProjects.length >=
                 9 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-6 md:gap-2 text-lavender md:pt-30">
@@ -3040,8 +2898,6 @@ export default function AllWorksSection() {
                     )}
                 </div>
               )}
-
-              {/* PROJECTS 12 + 13 */}
 
               {activeProjects.length >=
                 12 && (
@@ -3092,8 +2948,6 @@ export default function AllWorksSection() {
                 </div>
               )}
 
-              {/* ANY PROJECTS AFTER 13 */}
-
               {activeProjects.length >
                 13 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
@@ -3143,8 +2997,6 @@ export default function AllWorksSection() {
                 </div>
               )}
 
-              {/* EMPTY STATE */}
-
               {activeProjects.length ===
                 0 && (
                 <div className="flex items-center justify-center py-32">
@@ -3153,8 +3005,6 @@ export default function AllWorksSection() {
                   </span>
                 </div>
               )}
-
-              {/* LOAD MORE */}
 
               {visibleCount <
                 filteredProjects.length && (
@@ -3171,7 +3021,7 @@ export default function AllWorksSection() {
               )}
             </div>
           ) : (
-            /* LIST VIEW */
+            /* LIST VIEW — UNTOUCHED */
 
             <div
               ref={
@@ -3251,8 +3101,6 @@ export default function AllWorksSection() {
           )}
         </div>
       </div>
-
-      {/* FOOTER */}
 
       <Footer />
     </div>
