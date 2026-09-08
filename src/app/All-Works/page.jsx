@@ -37,12 +37,13 @@ const WORKS_QUERY = groq`
     _type == "caseStudy"
     && defined(slug.current)
   ]
-  | order(_createdAt asc)
+  | order(order asc)
   {
     _id,
     title,
     client,
     date,
+    order,
     "slug": slug.current,
 
     heroVideos[]{

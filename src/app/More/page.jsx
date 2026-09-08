@@ -43,13 +43,14 @@ const SELECTED_WORKS_QUERY = `
     _type == "caseStudy" &&
     defined(slug.current)
   ]
-  | order(_createdAt asc)
+  | order(order asc)
   [0...5]
   {
     _id,
     client,
     title,
     date,
+    order,
     "slug": slug.current,
 
     heroVideos[]{

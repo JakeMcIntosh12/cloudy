@@ -403,7 +403,7 @@ function Navigation({
 
           <BlurFlicker>
             <TransitionLink href="/Weddings">
-              MORE
+              VOWS
             </TransitionLink>
           </BlurFlicker>
 
@@ -516,12 +516,10 @@ function Navigation({
                 className="inline-flex items-start hover:text-zinc-400 transition-colors leading-none"
               >
                 <span>
-                  MORE
+                 VOWS
                 </span>
 
-                <sup className="inline-block text-[8px] font-geist-mono text-zinc-600 uppercase font-medium tracking-wide leading-tight max-w-[70px] -mt-[-8px] whitespace-normal ml-4">
-                  MEDIA BY CLOUDHAUS
-                </sup>
+                
               </TransitionLink>
             </div>
           </div>

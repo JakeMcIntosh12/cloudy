@@ -50,6 +50,17 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
 
+    // ================================ //
+    // PROJECT ORDERING //
+    // ================================ //
+
+    defineField({
+  name: "order",
+  title: "Project Order",
+  type: "number",
+  description: "Controls the order projects appear across the website.",
+}),
+
     // =========================================================
     // HERO VIDEOS
     // =========================================================
