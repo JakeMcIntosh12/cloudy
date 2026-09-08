@@ -314,7 +314,7 @@ function Footer() {
                   href="/Weddings"
                   className="hover:opacity-70 transition-opacity"
                 >
-                  MORE
+                  VOWS
                 </TransitionLink>
               </BlurFlicker>
             </div>
@@ -477,7 +477,7 @@ function Footer() {
                   href="/Weddings"
                   className="hover:opacity-70 transition-opacity"
                 >
-                  MORE
+                  VOWS
                 </TransitionLink>
               </BlurFlicker>
             </div>

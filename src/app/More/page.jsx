@@ -55,12 +55,14 @@ const SELECTED_WORKS_QUERY = `
 
     heroVideos[]{
       _key,
-      "src": select(
-        sourceType == "cloudinary" => url,
-        sourceType == "sanity" => video.asset->url,
-        null
+      sourceType,
+      url,
+      "sanityUrl": video.asset->url,
+      "src": coalesce(
+        url,
+        video.asset->url
       )
-    },
+    }
   }
 `;
 
@@ -440,10 +442,6 @@ const normalizeProject = (
 // 4. WORK CARD COMPONENT
 // ----------------------------------------------------------------------
 
-// ----------------------------------------------------------------------
-// 4. WORK CARD COMPONENT
-// ----------------------------------------------------------------------
-
 function WorkCard({
   video,
   containerClassName,
@@ -471,7 +469,7 @@ function WorkCard({
   // VIDEO METADATA
   // --------------------------------------------------
 
-  const handleLoadedMetadata =
+  const handleLoadedData =
     (e) => {
       const videoEl =
         e.currentTarget;
@@ -720,9 +718,9 @@ function WorkCard({
             loop
             muted
             playsInline
-            preload="metadata"
-            onLoadedMetadata={
-              handleLoadedMetadata
+            preload="auto"
+            onLoadedData={
+              handleLoadedData
             }
             onTimeUpdate={
               handleTimeUpdate
