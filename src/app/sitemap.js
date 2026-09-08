@@ -1,5 +1,5 @@
 export default function sitemap() {
-  const baseUrl = "https://steamhaus.vercel.app";
+  const baseUrl = "https://www.cloudhausmedia.com";
 
   return [
     {
