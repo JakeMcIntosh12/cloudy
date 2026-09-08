@@ -983,8 +983,8 @@ function Home() {
             LOADING {String(progress).padStart(3, '0')}%
           </h1>
 
-          <p className="font-geist-mono text-ghost-white p-4 text-xs md:text-sm text-zinc-600">
-            IT ALL STARTS WITH AN IDEA
+          <p className="font-geist-mono text-ghost-white p-4 text-xs md:text-sm text-zinc-600 uppercase">
+            Turning exceptional work into lasting impressions.
           </p>
         </div>
       )}

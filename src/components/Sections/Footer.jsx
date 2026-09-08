@@ -238,7 +238,7 @@ function Footer() {
             />
 
             <p className="w-full max-w-[clamp(20rem,40vw,22.875rem)] text-[clamp(0.8rem,1vw,1rem)] text-zinc-600 leading-[130%] font-geist-mono uppercase">
-              We turn exceptional work into lasting impressions.
+              Turning exceptional work into lasting impressions.
             </p>
           </div>
 
