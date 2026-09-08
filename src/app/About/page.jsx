@@ -393,7 +393,7 @@ export default function Page() {
               LINKS AND MORE INFO
           ================================================= */}
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 gap-8 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full">
             {/* CONTACT */}
 
             <div className="flex flex-col space-y-4">
@@ -427,7 +427,7 @@ export default function Page() {
                   <p>0404 104 360</p>
                   <p>ADELAIDE, SOUTH AUSTRALIA</p>
                   <a
-                    className="hover:text-zinc-600 hover:font-medium transition trransition-all duration-500"
+                    className="hover:text-zinc-600 hover:font-medium transition trransition-all duration-500 break-words md:w-auto"
                     href="mailto:hello@cloudhausmedia.com"
                   >
                     hello@cloudhausmedia.com
