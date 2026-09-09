@@ -436,7 +436,7 @@ function LightningFlash({
 
       if (pointLightRef.current) {
         pointLightRef.current.intensity =
-          intensity * 22;
+          intensity * 14;
 
         scratchColor.current
           .copy(baseColor.current)
@@ -455,12 +455,12 @@ function LightningFlash({
 
       if (ambientRef.current) {
         ambientRef.current.intensity =
-          1.2 + intensity * 2.4;
+          1.2 + intensity * 1.5;
       }
 
       if (directionalRef.current) {
         directionalRef.current.intensity =
-          1.1 + intensity * 3.0;
+          1.1 + intensity * 1.8;
       }
 
       return;
