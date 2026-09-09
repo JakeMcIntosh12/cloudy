@@ -71,19 +71,18 @@ function useViewportHeight() {
     update();
 
     if (vv) {
-      // fires as the browser chrome hides/shows mid-scroll,
-      // which is exactly the moment that causes the gap
       vv.addEventListener("resize", update, {
         passive: true,
       });
+
       vv.addEventListener("scroll", update, {
         passive: true,
       });
     } else {
-      // fallback for browsers without visualViewport support
       window.addEventListener("resize", update, {
         passive: true,
       });
+
       window.addEventListener("scroll", update, {
         passive: true,
       });
@@ -161,9 +160,6 @@ const scrollState = {
 
 /* =========================================================
    CLOUD CLUSTER POSITIONS
-   Shared between the visual clouds and the flash point light,
-   so a strike always lands exactly inside a real cloud mass
-   instead of floating in empty space.
 ========================================================= */
 
 const CLOUD_CLUSTERS = [
@@ -185,7 +181,10 @@ function pickWeightedCluster() {
 
   for (const cluster of CLOUD_CLUSTERS) {
     r -= cluster.weight;
-    if (r <= 0) return cluster.pos;
+
+    if (r <= 0) {
+      return cluster.pos;
+    }
   }
 
   return CLOUD_CLUSTERS[0].pos;
@@ -244,13 +243,6 @@ function WebGLContextGuard({ onLost, onRestored }) {
 
 /* =========================================================
    LIGHTNING FLASH
-   - fires a train of 1-3 short "return stroke" pulses per
-     event (real lightning almost never fires just once)
-   - drives a pointLight positioned inside a real cloud
-     cluster, so the light reads as coming from within the
-     clouds rather than as a flat global brightness bump
-   - also gives ambient/directional a smaller, secondary
-     bump so the rest of the scene still catches some of it
 ========================================================= */
 
 function LightningFlash({
@@ -279,14 +271,14 @@ function LightningFlash({
     new THREE.Color()
   );
 
-  /* -------------------------------------------------------
-     Fast triangular pop for a single pulse - at these
-     durations (30-60ms, 2-4 frames) a simple rise/fall
-     reads as a real strike without needing a fancier curve.
-  ------------------------------------------------------- */
   const pulseShape = (t) => {
-    const clamped = THREE.MathUtils.clamp(t, 0, 1);
-    return 1 - Math.abs(clamped * 2 - 1);
+    const clamped =
+      THREE.MathUtils.clamp(t, 0, 1);
+
+    return (
+      1 -
+      Math.abs(clamped * 2 - 1)
+    );
   };
 
   const triggerFlash = () => {
@@ -305,7 +297,11 @@ function LightningFlash({
     const built = [];
     let cursor = 0;
 
-    for (let i = 0; i < pulseCount; i++) {
+    for (
+      let i = 0;
+      i < pulseCount;
+      i++
+    ) {
       const duration =
         0.03 + Math.random() * 0.03;
 
@@ -329,18 +325,26 @@ function LightningFlash({
 
     pulses.current = built;
 
-    // small trailing after-glow once the last pulse ends
-    flashDuration.current = cursor + 0.18;
+    flashDuration.current =
+      cursor + 0.18;
+
     flashTime.current = 0.0001;
 
     if (pointLightRef.current) {
-      const [x, y, z] = pickWeightedCluster();
-      pointLightRef.current.position.set(x, y, z);
+      const [x, y, z] =
+        pickWeightedCluster();
+
+      pointLightRef.current.position.set(
+        x,
+        y,
+        z
+      );
     }
   };
 
   useFrame((state, delta) => {
-    const elapsed = state.clock.elapsedTime;
+    const elapsed =
+      state.clock.elapsedTime;
 
     /* =======================================================
        WAIT FOR NEXT LIGHTNING EVENT
@@ -360,16 +364,14 @@ function LightningFlash({
     if (flashTime.current > 0) {
       flashTime.current += delta;
 
-      const time = flashTime.current;
+      const time =
+        flashTime.current;
 
       let intensity = 0;
 
-      /* -------------------------------------------------------
-         SUM CONTRIBUTIONS FROM EACH RETURN-STROKE PULSE
-      ------------------------------------------------------- */
-
       for (const pulse of pulses.current) {
-        const localTime = time - pulse.start;
+        const localTime =
+          time - pulse.start;
 
         if (
           localTime >= 0 &&
@@ -377,30 +379,34 @@ function LightningFlash({
         ) {
           intensity +=
             pulse.strength *
-            pulseShape(localTime / pulse.duration);
+            pulseShape(
+              localTime /
+                pulse.duration
+            );
         }
       }
 
-      /* -------------------------------------------------------
-         SOFT AFTERGLOW AFTER THE LAST PULSE
-      ------------------------------------------------------- */
-
       const lastPulse =
-        pulses.current[pulses.current.length - 1];
+        pulses.current[
+          pulses.current.length - 1
+        ];
 
       const lastPulseEnd = lastPulse
-        ? lastPulse.start + lastPulse.duration
+        ? lastPulse.start +
+          lastPulse.duration
         : 0;
 
       if (
         intensity === 0 &&
         time >= lastPulseEnd &&
-        time < flashDuration.current
+        time <
+          flashDuration.current
       ) {
         const remaining =
           1 -
           (time - lastPulseEnd) /
-            (flashDuration.current - lastPulseEnd);
+            (flashDuration.current -
+              lastPulseEnd);
 
         intensity =
           peakStrength.current *
@@ -412,16 +418,20 @@ function LightningFlash({
          END EVENT
       ------------------------------------------------------- */
 
-      if (time >= flashDuration.current) {
+      if (
+        time >=
+        flashDuration.current
+      ) {
         flashTime.current = 0;
 
         nextFlashTime.current =
-          elapsed + 1.6 + Math.random() * 3.5;
+          elapsed +
+          1.6 +
+          Math.random() * 3.5;
       }
 
       /* -------------------------------------------------------
-         APPLY: POINT LIGHT INSIDE THE CLOUDS DOES THE HEAVY
-         LIFTING, AMBIENT/DIRECTIONAL GIVE A SMALLER GLOBAL KICK
+         APPLY LIGHTNING
       ------------------------------------------------------- */
 
       if (pointLightRef.current) {
@@ -432,7 +442,10 @@ function LightningFlash({
           .copy(baseColor.current)
           .lerp(
             flashColor.current,
-            Math.min(1, intensity * 0.8)
+            Math.min(
+              1,
+              intensity * 0.8
+            )
           );
 
         pointLightRef.current.color.copy(
@@ -454,24 +467,30 @@ function LightningFlash({
     }
 
     /* =======================================================
-       NORMAL LIGHTING (ease everything back to rest)
+       NORMAL LIGHTING
     ======================================================= */
 
     if (pointLightRef.current) {
       pointLightRef.current.intensity +=
-        (0 - pointLightRef.current.intensity) *
+        (0 -
+          pointLightRef.current
+            .intensity) *
         Math.min(1, delta * 16);
     }
 
     if (ambientRef.current) {
       ambientRef.current.intensity +=
-        (1.2 - ambientRef.current.intensity) *
+        (1.2 -
+          ambientRef.current
+            .intensity) *
         Math.min(1, delta * 12);
     }
 
     if (directionalRef.current) {
       directionalRef.current.intensity +=
-        (1.1 - directionalRef.current.intensity) *
+        (1.1 -
+          directionalRef.current
+            .intensity) *
         Math.min(1, delta * 12);
     }
   });
@@ -483,7 +502,9 @@ function LightningFlash({
    RADIAL STEAM
 ========================================================= */
 
-function RadialVaporRing({ flashLightRef }) {
+function RadialVaporRing({
+  flashLightRef,
+}) {
   const containerRef = useRef();
 
   const smoothScroll = useRef(0);
@@ -499,33 +520,39 @@ function RadialVaporRing({ flashLightRef }) {
 
       if (
         lenisInstance &&
-        typeof lenisInstance.limit === "number" &&
+        typeof lenisInstance.limit ===
+          "number" &&
         lenisInstance.limit > 0
       ) {
         docHeightRef.current =
           lenisInstance.limit;
+
         return;
       }
 
-      if (typeof document !== "undefined") {
+      if (
+        typeof document !== "undefined"
+      ) {
         const docElement =
           document.documentElement;
 
         const viewportHeight =
           (typeof window !== "undefined" &&
             window.visualViewport &&
-            window.visualViewport.height) ||
+            window.visualViewport
+              .height) ||
           (typeof window !== "undefined"
             ? window.innerHeight
             : 0);
 
-        docHeightRef.current = docElement
-          ? Math.max(
-              1,
-              docElement.scrollHeight -
-                viewportHeight
-            )
-          : 1;
+        docHeightRef.current =
+          docElement
+            ? Math.max(
+                1,
+                docElement.scrollHeight -
+                  viewportHeight
+              )
+            : 1;
       }
     };
 
@@ -540,20 +567,26 @@ function RadialVaporRing({ flashLightRef }) {
       vv.addEventListener(
         "resize",
         updateDocHeight,
-        { passive: true }
+        {
+          passive: true,
+        }
       );
     } else {
       window.addEventListener(
         "resize",
         updateDocHeight,
-        { passive: true }
+        {
+          passive: true,
+        }
       );
     }
 
     window.addEventListener(
       "orientationchange",
       updateDocHeight,
-      { passive: true }
+      {
+        passive: true,
+      }
     );
 
     return () => {
@@ -577,7 +610,8 @@ function RadialVaporRing({ flashLightRef }) {
   }, []);
 
   useFrame((state, delta) => {
-    const container = containerRef.current;
+    const container =
+      containerRef.current;
 
     if (!container) return;
 
@@ -597,50 +631,64 @@ function RadialVaporRing({ flashLightRef }) {
        TARGET SCROLL
     ======================================================= */
 
-    scrollState.target = actualScrollY;
+    scrollState.target =
+      actualScrollY;
 
     smoothScroll.current +=
-      (scrollState.target - smoothScroll.current) *
+      (scrollState.target -
+        smoothScroll.current) *
       Math.min(1, delta * 15);
 
-    scrollState.current = smoothScroll.current;
+    scrollState.current =
+      smoothScroll.current;
 
     /* =======================================================
        DOCUMENT PROGRESS
     ======================================================= */
 
-    const rawProgress = THREE.MathUtils.clamp(
-      scrollState.current / docHeightRef.current,
-      0,
-      1
-    );
+    const rawProgress =
+      THREE.MathUtils.clamp(
+        scrollState.current /
+          docHeightRef.current,
+        0,
+        1
+      );
 
-    const progress = THREE.MathUtils.smoothstep(
-      rawProgress,
-      0,
-      0.85
-    );
+    const progress =
+      THREE.MathUtils.smoothstep(
+        rawProgress,
+        0,
+        0.85
+      );
 
     /* =======================================================
        CONTROLLED CLOUD PULL
     ======================================================= */
 
     const maxPull = 2.8;
-    const targetDepth = progress * maxPull;
+
+    const targetDepth =
+      progress * maxPull;
 
     smoothDepth.current +=
-      (targetDepth - smoothDepth.current) *
+      (targetDepth -
+        smoothDepth.current) *
       Math.min(1, delta * 4);
 
-    container.position.z = smoothDepth.current;
+    container.position.z =
+      smoothDepth.current;
 
     /* =======================================================
        CONTROLLED ZOOM
     ======================================================= */
 
     const maxZoom = 0.65;
-    const zoom = progress * maxZoom;
-    const finalScale = 1 + zoom;
+
+    const zoom =
+      progress * maxZoom;
+
+    const finalScale =
+      1 + zoom;
 
     container.scale.set(
       finalScale,
@@ -652,29 +700,39 @@ function RadialVaporRing({ flashLightRef }) {
        SUBTLE LATERAL MOVEMENT
     ======================================================= */
 
-    const lateral = progress * Math.PI * 1.25;
+    const lateral =
+      progress * Math.PI * 1.25;
 
-    container.position.x = Math.sin(lateral) * 0.18;
-    container.position.y = Math.cos(lateral * 0.7) * 0.08;
+    container.position.x =
+      Math.sin(lateral) * 0.18;
+
+    container.position.y =
+      Math.cos(lateral * 0.7) *
+      0.08;
 
     /* =======================================================
        SUBTLE ROTATION
     ======================================================= */
 
-    const time = state.clock.elapsedTime;
+    const time =
+      state.clock.elapsedTime;
 
-    container.rotation.z = Math.sin(time * 0.18) * 0.018;
-    container.rotation.x = Math.cos(time * 0.16) * 0.014;
+    container.rotation.z =
+      Math.sin(time * 0.18) *
+      0.018;
+
+    container.rotation.x =
+      Math.cos(time * 0.16) *
+      0.014;
   });
 
   return (
     <group ref={containerRef}>
+
       {/* =====================================================
-          FLASH LIGHT - lives inside the same group as the
-          clouds so it animates (scroll pull/zoom/drift) right
-          along with them, and always looks co-located with a
-          real cloud mass instead of floating in open space.
+          FLASH LIGHT
       ===================================================== */}
+
       <pointLight
         ref={flashLightRef}
         intensity={0}
@@ -690,29 +748,41 @@ function RadialVaporRing({ flashLightRef }) {
       >
 
         {/* =================================================
-            TOP ATMOSPHERE
+            TOP LEFT ATMOSPHERE
         ================================================= */}
 
-        <group position={CLOUD_CLUSTERS[0].pos}>
+        <group
+          position={
+            CLOUD_CLUSTERS[0].pos
+          }
+        >
           <Cloud
             seed={12}
             scale={3.2}
-            volume={26}
+            volume={28}
             color="#ffffff"
-            opacity={0.25}
+            opacity={0.29}
             fade={65}
             speed={0.25}
             growth={3.5}
           />
         </group>
 
-        <group position={CLOUD_CLUSTERS[1].pos}>
+        {/* =================================================
+            TOP RIGHT ATMOSPHERE
+        ================================================= */}
+
+        <group
+          position={
+            CLOUD_CLUSTERS[1].pos
+          }
+        >
           <Cloud
             seed={34}
             scale={3.3}
-            volume={20}
+            volume={22}
             color="#e8e8e8"
-            opacity={0.22}
+            opacity={0.26}
             fade={65}
             speed={0.30}
             growth={2.2}
@@ -723,13 +793,17 @@ function RadialVaporRing({ flashLightRef }) {
             TOP CENTER ATMOSPHERE
         ================================================= */}
 
-        <group position={CLOUD_CLUSTERS[2].pos}>
+        <group
+          position={
+            CLOUD_CLUSTERS[2].pos
+          }
+        >
           <Cloud
             seed={91}
             scale={3.4}
-            volume={15}
+            volume={18}
             color="#ffffff"
-            opacity={0.09}
+            opacity={0.11}
             fade={85}
             speed={0.10}
             growth={3}
@@ -737,29 +811,41 @@ function RadialVaporRing({ flashLightRef }) {
         </group>
 
         {/* =================================================
-            BOTTOM ATMOSPHERE
+            BOTTOM LEFT ATMOSPHERE
         ================================================= */}
 
-        <group position={CLOUD_CLUSTERS[3].pos}>
+        <group
+          position={
+            CLOUD_CLUSTERS[3].pos
+          }
+        >
           <Cloud
             seed={56}
             scale={3.0}
-            volume={10}
+            volume={13}
             color="#d0d0d0"
-            opacity={0.10}
+            opacity={0.12}
             fade={75}
             speed={0.2}
             growth={1.5}
           />
         </group>
 
-        <group position={CLOUD_CLUSTERS[4].pos}>
+        {/* =================================================
+            BOTTOM RIGHT ATMOSPHERE
+        ================================================= */}
+
+        <group
+          position={
+            CLOUD_CLUSTERS[4].pos
+          }
+        >
           <Cloud
             seed={78}
             scale={3.2}
-            volume={10}
+            volume={13}
             color="#ffffff"
-            opacity={0.08}
+            opacity={0.10}
             fade={75}
             speed={0.12}
             growth={3}
@@ -770,13 +856,17 @@ function RadialVaporRing({ flashLightRef }) {
             BOTTOM CENTER ATMOSPHERE
         ================================================= */}
 
-        <group position={CLOUD_CLUSTERS[5].pos}>
+        <group
+          position={
+            CLOUD_CLUSTERS[5].pos
+          }
+        >
           <Cloud
             seed={101}
             scale={3.2}
-            volume={14}
+            volume={17}
             color="#eeeeee"
-            opacity={0.08}
+            opacity={0.10}
             fade={90}
             speed={0.12}
             growth={3}
@@ -794,16 +884,20 @@ function RadialVaporRing({ flashLightRef }) {
 
 export default function GlobalCinematicFog() {
   const isClient = useIsClient();
-  const viewportHeight = useViewportHeight();
-  const [canvasKey, setCanvasKey] = useState(0);
+  const viewportHeight =
+    useViewportHeight();
 
-  const ambientLightRef = useRef();
-  const directionalLightRef = useRef();
+  const [canvasKey, setCanvasKey] =
+    useState(0);
 
-  // point light rendered inside the cloud group in RadialVaporRing,
-  // controlled from LightningFlash - this is what makes the strike
-  // look like it's coming from inside the clouds
-  const flashPointLightRef = useRef();
+  const ambientLightRef =
+    useRef();
+
+  const directionalLightRef =
+    useRef();
+
+  const flashPointLightRef =
+    useRef();
 
   if (!isClient) return null;
 
@@ -818,22 +912,33 @@ export default function GlobalCinematicFog() {
       "
       style={{
         width: "100%",
-        // explicit pixel height synced to the real visual
-        // viewport - falls back to 100dvh only for the very
-        // first paint before the JS measurement lands
+
         height: viewportHeight
           ? `${viewportHeight}px`
           : "100dvh",
+
         pointerEvents: "none",
         touchAction: "none",
-        transform: "translateZ(0)",
-        WebkitTransform: "translate3d(0,0,0)",
-        willChange: "transform, height",
-        backfaceVisibility: "hidden",
-        WebkitBackfaceVisibility: "hidden",
+
+        transform:
+          "translateZ(0)",
+
+        WebkitTransform:
+          "translate3d(0,0,0)",
+
+        willChange:
+          "transform, height",
+
+        backfaceVisibility:
+          "hidden",
+
+        WebkitBackfaceVisibility:
+          "hidden",
       }}
     >
-      <WebGLSceneErrorBoundary key={canvasKey}>
+      <WebGLSceneErrorBoundary
+        key={canvasKey}
+      >
         <Canvas
           dpr={[1, 1.5]}
           camera={{
@@ -841,7 +946,9 @@ export default function GlobalCinematicFog() {
             fov: 75,
           }}
           gl={{
-            powerPreference: "high-performance",
+            powerPreference:
+              "high-performance",
+
             antialias: false,
             alpha: true,
             stencil: false,
@@ -854,15 +961,18 @@ export default function GlobalCinematicFog() {
             enabled: false,
           })}
           onCreated={({ scene }) => {
-            scene.fog = new THREE.FogExp2(
-              "#0a0c10",
-              0.001
-            );
+            scene.fog =
+              new THREE.FogExp2(
+                "#0a0c10",
+                0.001
+              );
           }}
         >
           <WebGLContextGuard
             onRestored={() =>
-              setCanvasKey((k) => k + 1)
+              setCanvasKey(
+                (k) => k + 1
+              )
             }
           />
 
@@ -878,14 +988,22 @@ export default function GlobalCinematicFog() {
           />
 
           <LightningFlash
-            ambientRef={ambientLightRef}
-            directionalRef={directionalLightRef}
-            pointLightRef={flashPointLightRef}
+            ambientRef={
+              ambientLightRef
+            }
+            directionalRef={
+              directionalLightRef
+            }
+            pointLightRef={
+              flashPointLightRef
+            }
           />
 
           <Suspense fallback={null}>
             <RadialVaporRing
-              flashLightRef={flashPointLightRef}
+              flashLightRef={
+                flashPointLightRef
+              }
             />
           </Suspense>
         </Canvas>
