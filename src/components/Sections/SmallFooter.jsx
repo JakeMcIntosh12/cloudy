@@ -67,10 +67,10 @@ export default function BottomContent() {
         gap-[clamp(0.45rem,0.8vw,1.5rem)]
         pt-14
         md:pt-28
-        px-0
-        pb-2
-        md:pb-2
-        md:px-0
+        px-4
+        pb-4
+        md:pb-4
+        md:px-4
       "
     >
       <div
