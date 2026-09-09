@@ -93,11 +93,118 @@ function getHeroVideoUrl(project) {
 }
 
 // ----------------------------------------------------------------------
+// BUNNY POSTER URL
+// ----------------------------------------------------------------------
+//
+// Bunny Stream convention:
+//
+// playlist.m3u8
+// thumbnail.jpg
+//
+// Both live inside the same video directory.
+//
+// Example:
+// https://vz-XXXXXXXX.b-cdn.net/video-id/playlist.m3u8
+//
+// becomes:
+// https://vz-XXXXXXXX.b-cdn.net/video-id/thumbnail.jpg
+// ----------------------------------------------------------------------
+
+function getBunnyPosterUrl(hlsUrl) {
+  if (
+    typeof hlsUrl !== "string" ||
+    !hlsUrl.trim()
+  ) {
+    return null;
+  }
+
+  if (
+    hlsUrl.includes("playlist.m3u8")
+  ) {
+    return hlsUrl.replace(
+      "playlist.m3u8",
+      "thumbnail.jpg"
+    );
+  }
+
+  // Fallback for Bunny setups using
+  // another manifest filename.
+  const lastSlash =
+    hlsUrl.lastIndexOf("/");
+
+  if (lastSlash === -1) {
+    return null;
+  }
+
+  return `${hlsUrl.slice(
+    0,
+    lastSlash
+  )}/thumbnail.jpg`;
+}
+
+// ----------------------------------------------------------------------
+// HLS CONCURRENCY QUEUE
+// ----------------------------------------------------------------------
+//
+// Prevents all 13 cards from simultaneously hammering
+// Bunny with HLS requests.
+//
+// Normal cards:
+// max 4 HLS loads at once.
+//
+// Priority cards:
+// first 3 cards can start immediately.
+// ----------------------------------------------------------------------
+
+const MAX_CONCURRENT_HLS = 4;
+
+let activeHlsCount = 0;
+
+const hlsQueue = [];
+
+function scheduleHlsLoad(
+  task,
+  isPriority = false
+) {
+  const run = () => {
+    activeHlsCount++;
+
+    Promise.resolve()
+      .then(task)
+      .finally(() => {
+        activeHlsCount--;
+
+        if (hlsQueue.length) {
+          const next =
+            hlsQueue.shift();
+
+          next();
+        }
+      });
+  };
+
+  if (
+    isPriority ||
+    activeHlsCount <
+      MAX_CONCURRENT_HLS
+  ) {
+    run();
+  } else {
+    hlsQueue.push(run);
+  }
+}
+
+// ----------------------------------------------------------------------
 // HLS VIDEO ATTACHMENT
 // ----------------------------------------------------------------------
 
-function useHlsVideo(videoRef, source) {
-  const hlsRef = useRef(null);
+function useHlsVideo(
+  videoRef,
+  source,
+  isPriority = false
+) {
+  const hlsRef =
+    useRef(null);
 
   useEffect(() => {
     const video =
@@ -107,6 +214,8 @@ function useHlsVideo(videoRef, source) {
       return;
     }
 
+    let cancelled = false;
+
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -114,10 +223,16 @@ function useHlsVideo(videoRef, source) {
 
     video.pause();
 
-    video.removeAttribute("src");
+    video.removeAttribute(
+      "src"
+    );
+
     video.load();
 
-    // Safari / browsers with native HLS support
+    // --------------------------------------------------
+    // SAFARI / NATIVE HLS
+    // --------------------------------------------------
+
     if (
       video.canPlayType(
         "application/vnd.apple.mpegurl"
@@ -128,55 +243,141 @@ function useHlsVideo(videoRef, source) {
 
       return () => {
         video.pause();
-        video.removeAttribute("src");
+        video.removeAttribute(
+          "src"
+        );
         video.load();
       };
     }
 
-    // Chrome / Firefox / Edge via hls.js
-    if (
-      Hls.isSupported()
-    ) {
-      const hls =
-        new Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          backBufferLength: 30,
-          capLevelToPlayerSize: false,
-          startLevel: -1,
-        });
+    // --------------------------------------------------
+    // HLS.JS
+    // --------------------------------------------------
 
-      hlsRef.current = hls;
-
-      hls.on(
-        Hls.Events.MANIFEST_PARSED,
+    if (Hls.isSupported()) {
+      scheduleHlsLoad(
         () => {
-          // Let hls.js choose the appropriate
-          // quality level automatically.
-        }
+          return new Promise(
+            (resolve) => {
+              if (cancelled) {
+                resolve();
+                return;
+              }
+
+              const hls =
+                new Hls({
+                  enableWorker:
+                    true,
+
+                  lowLatencyMode:
+                    false,
+
+                  backBufferLength:
+                    30,
+
+                  // Important:
+                  // allow hls.js to avoid
+                  // unnecessarily downloading
+                  // oversized quality levels.
+                  capLevelToPlayerSize:
+                    true,
+
+                  maxBufferLength:
+                    8,
+
+                  maxMaxBufferLength:
+                    20,
+
+                  startLevel: -1,
+                });
+
+              hlsRef.current =
+                hls;
+
+              let resolved =
+                false;
+
+              const finish =
+                () => {
+                  if (
+                    resolved
+                  ) {
+                    return;
+                  }
+
+                  resolved = true;
+                  resolve();
+                };
+
+              hls.on(
+                Hls.Events.MANIFEST_PARSED,
+                () => {
+                  finish();
+                }
+              );
+
+              hls.on(
+                Hls.Events.ERROR,
+                (_, data) => {
+                  if (
+                    data?.fatal
+                  ) {
+                    finish();
+                  }
+                }
+              );
+
+              if (cancelled) {
+                finish();
+                return;
+              }
+
+              hls.loadSource(
+                source
+              );
+
+              hls.attachMedia(
+                video
+              );
+            }
+          );
+        },
+        isPriority
       );
 
-      hls.loadSource(source);
-      hls.attachMedia(video);
-
       return () => {
-        hls.destroy();
-        hlsRef.current = null;
+        cancelled = true;
+
+        if (
+          hlsRef.current
+        ) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
 
         video.pause();
-        video.removeAttribute("src");
+
+        video.removeAttribute(
+          "src"
+        );
+
         video.load();
       };
     }
 
     return () => {
       video.pause();
-      video.removeAttribute("src");
+
+      video.removeAttribute(
+        "src"
+      );
+
       video.load();
     };
   }, [
     videoRef,
     source,
+    isPriority,
   ]);
 }
 
@@ -729,6 +930,12 @@ function WorkCard({
   const [hasVideoError, setHasVideoError] =
     useState(false);
 
+  // NEW:
+  // Keeps the Bunny poster visible until
+  // the actual HLS video can play.
+  const [videoReady, setVideoReady] =
+    useState(false);
+
   const containerRef =
     useRef(null);
 
@@ -761,12 +968,26 @@ function WorkCard({
   );
 
   // --------------------------------------------------
-  // RESET VIDEO ERROR WHEN PROJECT CHANGES
+  // RESOLVE BUNNY POSTER
+  // --------------------------------------------------
+
+  const posterUrl = useMemo(
+    () =>
+      getBunnyPosterUrl(
+        rawUrl
+      ),
+    [rawUrl]
+  );
+
+  // --------------------------------------------------
+  // RESET VIDEO STATE WHEN PROJECT CHANGES
   // --------------------------------------------------
 
   useEffect(() => {
     setHasVideoError(false);
     setVideoUrl(null);
+    setVideoReady(false);
+    setCurrentTime("00:00");
   }, [rawUrl]);
 
   // --------------------------------------------------
@@ -775,7 +996,8 @@ function WorkCard({
 
   useHlsVideo(
     videoRef,
-    videoUrl
+    videoUrl,
+    priority
   );
 
   // --------------------------------------------------
@@ -794,6 +1016,9 @@ function WorkCard({
         }
 
         setHasVideoError(false);
+
+        setVideoReady(false);
+
         setVideoUrl(
           rawUrl
         );
@@ -807,61 +1032,6 @@ function WorkCard({
     );
 
   // --------------------------------------------------
-  // PRIORITY VIDEO PRELOAD HINT
-  // --------------------------------------------------
-
-  useEffect(() => {
-    if (
-      !priority ||
-      !rawUrl ||
-      typeof document ===
-        "undefined"
-    ) {
-      return;
-    }
-
-    const marker = `link[data-video-preload="${rawUrl}"]`;
-
-    if (
-      document.head.querySelector(
-        marker
-      )
-    ) {
-      return;
-    }
-
-    const preloadLink =
-      document.createElement(
-        "link"
-      );
-
-    preloadLink.rel =
-      "preload";
-
-    preloadLink.as =
-      "video";
-
-    preloadLink.href =
-      rawUrl;
-
-    preloadLink.setAttribute(
-      "data-video-preload",
-      rawUrl
-    );
-
-    document.head.appendChild(
-      preloadLink
-    );
-
-    return () => {
-      preloadLink.remove();
-    };
-  }, [
-    priority,
-    rawUrl,
-  ]);
-
-  // --------------------------------------------------
   // VIDEO ERROR FALLBACK
   // --------------------------------------------------
 
@@ -872,6 +1042,7 @@ function WorkCard({
       }
 
       setHasVideoError(true);
+      setVideoReady(false);
     }, [
       rawUrl,
     ]);
@@ -1061,6 +1232,13 @@ function WorkCard({
   // --------------------------------------------------
   // LOAD ALL VIDEOS IMMEDIATELY
   // --------------------------------------------------
+  //
+  // This still happens immediately.
+  //
+  // The difference is that useHlsVideo now controls
+  // how many HLS streams are actually initialised
+  // simultaneously.
+  // --------------------------------------------------
 
   useEffect(() => {
     if (!rawUrl) {
@@ -1136,14 +1314,69 @@ function WorkCard({
           ${heightClassName || ""}
         `}
       >
+        {/* --------------------------------------------------
+            BUNNY POSTER
+            --------------------------------------------------
+
+            This is a normal image request.
+
+            It does NOT wait for hls.js.
+
+            It stays visible while the HLS stream
+            initialises and disappears once the
+            video fires canplay.
+        -------------------------------------------------- */}
+
+        {posterUrl && (
+          <img
+            src={posterUrl}
+            alt=""
+            loading={
+              priority
+                ? "eager"
+                : "lazy"
+            }
+            decoding="async"
+            className={`
+              absolute
+              inset-0
+              w-full
+              h-full
+              object-cover
+              brightness-90
+              contrast-105
+              transition-opacity
+              duration-300
+              pointer-events-none
+              ${
+                videoReady
+                  ? "opacity-0"
+                  : "opacity-100"
+              }
+            `}
+          />
+        )}
+
+        {/* --------------------------------------------------
+            HLS VIDEO
+        -------------------------------------------------- */}
+
         {videoUrl ? (
           <video
             ref={videoRef}
             loop
             muted
             playsInline
-            preload="auto"
-            fetchPriority="auto"
+            preload={
+              priority
+                ? "auto"
+                : "metadata"
+            }
+            fetchPriority={
+              priority
+                ? "high"
+                : "auto"
+            }
             onError={
               handleVideoError
             }
@@ -1153,27 +1386,40 @@ function WorkCard({
             onTimeUpdate={
               handleTimeUpdate
             }
-            className="
-              block
+            onCanPlay={() =>
+              setVideoReady(true)
+            }
+            className={`
+              absolute
+              inset-0
               w-full
               h-full
               object-cover
               brightness-90
               contrast-105
-            "
+              transition-opacity
+              duration-300
+              ${
+                videoReady
+                  ? "opacity-100"
+                  : "opacity-0"
+              }
+            `}
           />
         ) : (
-          <div className="w-full h-full min-h-[220px] bg-zinc-900 flex flex-col items-center justify-center gap-2">
-            <span className="font-geist-mono text-xs text-zinc-500 uppercase">
-              No Preview
-            </span>
+          !posterUrl && (
+            <div className="w-full h-full min-h-[220px] bg-zinc-900 flex flex-col items-center justify-center gap-2">
+              <span className="font-geist-mono text-xs text-zinc-500 uppercase">
+                No Preview
+              </span>
 
-            <span className="font-geist-mono text-[9px] text-zinc-700 uppercase">
-              {rawUrl
-                ? "Video unavailable"
-                : "No hero video"}
-            </span>
-          </div>
+              <span className="font-geist-mono text-[9px] text-zinc-700 uppercase">
+                {rawUrl
+                  ? "Video unavailable"
+                  : "No hero video"}
+              </span>
+            </div>
+          )
         )}
 
         {/* DARK OVERLAY */}
@@ -2180,6 +2426,10 @@ export default function AllWorksSection() {
           enableWorker: true,
           lowLatencyMode: false,
           backBufferLength: 30,
+          capLevelToPlayerSize: true,
+          maxBufferLength: 8,
+          maxMaxBufferLength: 20,
+          startLevel: -1,
         });
 
       bgHlsRef.current =
