@@ -74,6 +74,9 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${plusJakartaSans.variable} ${fragmentMono.variable} antialiased`}
     >
+      <head>
+        <link rel="preconnect" href="https://vz-2f82c8b0-a77.b-cdn.net" />
+      </head>
       {" "}
       <body className="min-h-full flex flex-col">
         {" "}

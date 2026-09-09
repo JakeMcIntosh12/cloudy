@@ -1147,7 +1147,7 @@ function WorkCard({
             loop
             muted
             playsInline
-            preload="metadata"
+            preload="auto"
             fetchPriority="auto"
             onError={
               handleVideoError
