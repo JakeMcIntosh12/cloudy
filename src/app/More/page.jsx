@@ -25,7 +25,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-
+import Hls from "hls.js";
+import { groq } from "next-sanity";
 import { client } from "@/lib/client";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -38,7 +39,7 @@ gsap.registerPlugin(ScrollTrigger);
 // This does NOT affect the total counter.
 // ----------------------------------------------------------------------
 
-const SELECTED_WORKS_QUERY = `
+const SELECTED_WORKS_QUERY = groq`
   *[
     _type == "caseStudy" &&
     defined(slug.current)
@@ -55,13 +56,7 @@ const SELECTED_WORKS_QUERY = `
 
     heroVideos[]{
       _key,
-      sourceType,
-      url,
-      "sanityUrl": video.asset->url,
-      "src": coalesce(
-        url,
-        video.asset->url
-      )
+      "url": videoUrl
     }
   }
 `;
@@ -406,9 +401,9 @@ const normalizeProject = (
   const firstHeroVideo =
     project.heroVideos?.find(
       (video) =>
-        typeof video?.src ===
+        typeof video?.url ===
           "string" &&
-        video.src.length > 0
+        video.url.trim().length > 0
     );
 
   return {
@@ -421,7 +416,7 @@ const normalizeProject = (
       "",
 
     url:
-      firstHeroVideo?.src ||
+      firstHeroVideo?.url?.trim() ||
       null,
 
     title:
@@ -464,6 +459,97 @@ function WorkCard({
 
   const videoRef =
     useRef(null);
+
+  const hlsRef =
+    useRef(null);
+
+  const isHoveredRef =
+    useRef(false);
+
+  // --------------------------------------------------
+  // HLS VIDEO SETUP
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    const src = video?.url;
+
+    if (!videoEl || !src) {
+      return;
+    }
+
+    let hls = null;
+    let cancelled = false;
+
+    const playIfHovered = () => {
+      if (
+        !cancelled &&
+        isHoveredRef.current &&
+        videoRef.current
+      ) {
+        videoRef.current
+          .play()
+          .catch(() => {});
+      }
+    };
+
+    // Safari / browsers with native HLS support.
+    const hasNativeHls =
+      videoEl.canPlayType(
+        "application/vnd.apple.mpegurl"
+      ) !== "";
+
+    if (hasNativeHls) {
+      videoEl.src = src;
+      videoEl.load();
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+      });
+
+      hlsRef.current = hls;
+
+      hls.on(
+        Hls.Events.MANIFEST_PARSED,
+        playIfHovered
+      );
+
+      hls.on(
+        Hls.Events.ERROR,
+        (_event, data) => {
+          if (data?.fatal) {
+            console.error(
+              "Bunny HLS playback error:",
+              data
+            );
+          }
+        }
+      );
+
+      hls.loadSource(src);
+      hls.attachMedia(videoEl);
+    } else {
+      console.warn(
+        "HLS is not supported in this browser."
+      );
+    }
+
+    return () => {
+      cancelled = true;
+
+      if (hls) {
+        hls.destroy();
+      }
+
+      hlsRef.current = null;
+
+      videoEl.pause();
+      videoEl.removeAttribute("src");
+      videoEl.load();
+    };
+  }, [video?.url]);
 
   // --------------------------------------------------
   // VIDEO METADATA
@@ -508,6 +594,7 @@ function WorkCard({
 
   const handleMouseEnter =
     () => {
+      isHoveredRef.current = true;
       onHoverChange(true);
 
       if (
@@ -573,6 +660,7 @@ function WorkCard({
 
   const handleMouseLeave =
     () => {
+      isHoveredRef.current = false;
       onHoverChange(false);
 
       if (
@@ -714,11 +802,10 @@ function WorkCard({
         {video.url ? (
           <video
             ref={videoRef}
-            src={video.url}
             loop
             muted
             playsInline
-            preload="auto"
+            preload="metadata"
             onLoadedData={
               handleLoadedData
             }
@@ -729,11 +816,9 @@ function WorkCard({
           />
         ) : (
           <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-
             <span className="font-geist-mono text-[10px] text-zinc-600 uppercase tracking-widest">
               No Preview
             </span>
-
           </div>
         )}
 

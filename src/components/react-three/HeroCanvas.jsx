@@ -14,6 +14,7 @@ import {
 
 import * as THREE from 'three'
 import gsap from 'gsap'
+import Hls from 'hls.js'
 
 
 const SmudgeTransitionShader = {
@@ -889,6 +890,51 @@ function updateVideoResolution(
 
 
 // =========================================================
+// ATTACH HD HLS SOURCE
+// =========================================================
+
+function attachHdHlsSource(video, src, hlsRef) {
+
+  if (hlsRef.current) {
+    hlsRef.current.destroy()
+    hlsRef.current = null
+  }
+
+  video.pause()
+  video.removeAttribute('src')
+  video.load()
+
+  // Safari — native HLS support
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = src
+    video.load()
+    return
+  }
+
+  // Chrome / Firefox / Edge — via hls.js, forced to top rendition
+  if (Hls.isSupported()) {
+
+    const hls = new Hls({
+      enableWorker: true,
+      capLevelToPlayerSize: false,
+      startLevel: -1,
+    })
+
+    hlsRef.current = hls
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (hls.levels && hls.levels.length > 0) {
+        hls.currentLevel = hls.levels.length - 1
+      }
+    })
+
+    hls.loadSource(src)
+    hls.attachMedia(video)
+  }
+}
+
+
+// =========================================================
 // SHADER PLANE
 // =========================================================
 
@@ -936,6 +982,22 @@ function ShaderPlane({
 
 
   const texBRef =
+    useRef(null)
+
+
+  const hlsARef =
+    useRef(null)
+
+
+  const hlsBRef =
+    useRef(null)
+
+
+  const srcARef =
+    useRef(null)
+
+
+  const srcBRef =
     useRef(null)
 
 
@@ -1437,6 +1499,18 @@ function ShaderPlane({
 
 
       if (
+        hlsARef.current
+      ) {
+
+        hlsARef.current.destroy()
+
+        hlsARef.current =
+          null
+
+      }
+
+
+      if (
         videoARef.current
       ) {
 
@@ -1461,6 +1535,18 @@ function ShaderPlane({
         texARef.current.dispose()
 
         texARef.current =
+          null
+
+      }
+
+
+      if (
+        hlsBRef.current
+      ) {
+
+        hlsBRef.current.destroy()
+
+        hlsBRef.current =
           null
 
       }
@@ -1643,13 +1729,36 @@ function ShaderPlane({
       activeSrc
 
 
+    const isSlotA =
+      activeSlotRef.current === 0
+
+
+    const currentSrcRef =
+      isSlotA
+        ? srcARef
+        : srcBRef
+
+
+    const currentHlsRef =
+      isSlotA
+        ? hlsARef
+        : hlsBRef
+
+
     if (
-      currentVideo.src !==
+      currentSrcRef.current !==
       targetSrc
     ) {
 
-      currentVideo.src =
+      currentSrcRef.current =
         targetSrc
+
+
+      attachHdHlsSource(
+        currentVideo,
+        targetSrc,
+        currentHlsRef
+      )
 
 
       currentVideo.currentTime =
@@ -1874,16 +1983,28 @@ function ShaderPlane({
     // LOAD NEXT VIDEO
     // =====================================================
 
-    incomingVideo.pause()
+    const incomingHlsRef =
+      isSlotZero
+        ? hlsBRef
+        : hlsARef
 
-    incomingVideo.removeAttribute(
-      'src'
+
+    const incomingSrcRef =
+      isSlotZero
+        ? srcBRef
+        : srcARef
+
+
+    incomingSrcRef.current =
+      nextSrc
+
+
+    attachHdHlsSource(
+      incomingVideo,
+      nextSrc,
+      incomingHlsRef
     )
 
-    incomingVideo.load()
-
-    incomingVideo.src =
-      nextSrc
 
     incomingVideo.currentTime =
       0

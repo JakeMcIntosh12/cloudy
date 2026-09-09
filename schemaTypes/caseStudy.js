@@ -50,56 +50,77 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
 
-    // ================================ //
-    // PROJECT ORDERING //
-    // ================================ //
+    // =========================================================
+    // PROJECT ORDERING
+    // =========================================================
 
     defineField({
-  name: "order",
-  title: "Project Order",
-  type: "number",
-  description: "Controls the order projects appear across the website.",
-}),
+      name: "order",
+      title: "Project Order",
+      type: "number",
+      description:
+        "Controls the order projects appear across the website.",
+    }),
 
     // =========================================================
-    // HERO VIDEOS
+    // HERO VIDEOS — BUNNY STREAM
     // =========================================================
 
-   defineField({
-  name: "heroVideos",
-  title: "Hero Videos",
-  description: "Upload hero videos directly to Sanity.",
-  type: "array",
-  of: [
-    {
-      type: "object",
-      name: "heroVideo",
-      title: "Hero Video",
-      fields: [
-        defineField({
-          name: "video",
-          title: "Upload Video",
-          type: "file",
-          options: {
-            accept: "video/*",
+    defineField({
+      name: "heroVideos",
+      title: "Hero Videos",
+      description:
+        "Paste Bunny Stream HLS (.m3u8) URLs here. Upload and manage the videos in Bunny Stream, then paste the HLS URL into this field.",
+
+      type: "array",
+
+      of: [
+        {
+          type: "object",
+          name: "heroVideo",
+          title: "Hero Video",
+
+          fields: [
+            defineField({
+              name: "videoUrl",
+              title: "Bunny HLS URL",
+              description:
+                "Paste the Bunny Stream HLS playlist URL ending in /playlist.m3u8",
+
+              type: "url",
+
+              validation: (Rule) =>
+                Rule.required().custom((value) => {
+                  if (!value) return true;
+
+                  if (!value.endsWith(".m3u8")) {
+                    return "Please enter a Bunny HLS URL ending in /playlist.m3u8";
+                  }
+
+                  if (!value.includes("b-cdn.net")) {
+                    return "Please enter a Bunny Stream CDN URL.";
+                  }
+
+                  return true;
+                }),
+            }),
+          ],
+
+          preview: {
+            select: {
+              videoUrl: "videoUrl",
+            },
+
+            prepare({ videoUrl }) {
+              return {
+                title: "Bunny Stream Video",
+                subtitle: videoUrl || "No Bunny URL",
+              };
+            },
           },
-          validation: (Rule) => Rule.required(),
-        }),
+        },
       ],
-      preview: {
-        select: {
-          videoName: "video.asset.originalFilename",
-        },
-        prepare({ videoName }) {
-          return {
-            title: videoName || "Sanity Video",
-            subtitle: "Uploaded to Sanity",
-          };
-        },
-      },
-    },
-  ],
-}),
+    }),
 
     // =========================================================
     // PROJECT OVERVIEW
@@ -147,6 +168,7 @@ export default defineType({
       title: "Credits",
       description:
         "Add everyone involved in the project, including architects, designers, stylists, builders, photographers, and other collaborators.",
+
       type: "array",
 
       of: [
@@ -154,6 +176,7 @@ export default defineType({
           type: "object",
           name: "credit",
           title: "Credit",
+
           fields: [
             defineField({
               name: "name",
@@ -193,7 +216,9 @@ export default defineType({
       type: "array",
 
       validation: (Rule) =>
-        Rule.max(26).error("You can upload a maximum of 26 gallery items."),
+        Rule.max(26).error(
+          "You can upload a maximum of 26 gallery items."
+        ),
 
       options: {
         layout: "grid",
@@ -207,6 +232,7 @@ export default defineType({
             hotspot: true,
           },
         },
+
         {
           type: "file",
 

@@ -17,6 +17,8 @@ import Lenis from "lenis";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
+import Hls from "hls.js";
+
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -48,21 +50,8 @@ const WORKS_QUERY = groq`
 
     heroVideos[]{
       _key,
-      sourceType,
-      url,
-
-      "sanityUrl": video.asset->url,
-
-      "src": coalesce(
-        select(
-          sourceType == "cloudinary" => url,
-          sourceType == "sanity" => video.asset->url,
-          null
-        ),
-        video.asset->url,
-        url
-      )
-    },
+      "url": videoUrl
+    }
   }
 `;
 
@@ -77,200 +66,123 @@ function getHeroVideoUrl(project) {
     ? project.heroVideos
     : [];
 
-  const validVideo = videos.find(
-    (item) => {
-      const src =
-        typeof item?.src === "string"
-          ? item.src.trim()
-          : "";
+  const validVideo = videos.find((item) => {
+    const candidate =
+      item?.url ??
+      item?.asset?.url ??
+      item?.file?.asset?.url ??
+      item?.video?.asset?.url;
 
-      const sanityUrl =
-        typeof item?.sanityUrl === "string"
-          ? item.sanityUrl.trim()
-          : "";
-
-      const cloudinaryUrl =
-        typeof item?.url === "string"
-          ? item.url.trim()
-          : "";
-
-      return (
-        src.length > 0 ||
-        sanityUrl.length > 0 ||
-        cloudinaryUrl.length > 0
-      );
-    }
-  );
+    return (
+      typeof candidate === "string" &&
+      candidate.trim().length > 0
+    );
+  });
 
   if (!validVideo) {
     return null;
   }
 
-  if (
-    typeof validVideo.src === "string" &&
-    validVideo.src.trim()
-  ) {
-    return validVideo.src.trim();
-  }
+  const resolvedUrl =
+    validVideo.url ??
+    validVideo.asset?.url ??
+    validVideo.file?.asset?.url ??
+    validVideo.video?.asset?.url;
 
-  if (
-    typeof validVideo.sanityUrl === "string" &&
-    validVideo.sanityUrl.trim()
-  ) {
-    return validVideo.sanityUrl.trim();
-  }
-
-  if (
-    typeof validVideo.url === "string" &&
-    validVideo.url.trim()
-  ) {
-    return validVideo.url.trim();
-  }
-
-  return null;
+  return resolvedUrl.trim();
 }
 
 // ----------------------------------------------------------------------
-// CLOUDINARY DETECTION
+// HLS VIDEO ATTACHMENT
 // ----------------------------------------------------------------------
 
-function isCloudinaryUrl(url) {
-  return (
-    typeof url === "string" &&
-    url.includes("res.cloudinary.com") &&
-    url.includes("/upload/")
-  );
-}
+function useHlsVideo(videoRef, source) {
+  const hlsRef = useRef(null);
 
-// ----------------------------------------------------------------------
-// CLOUDINARY VIDEO OPTIMIZATION HELPERS
-// ----------------------------------------------------------------------
-
-function getBitrateForWidth(width) {
-  if (width <= 640) return "800k";
-  if (width <= 960) return "1200k";
-  return "2000k";
-}
-
-function getOptimizedVideoUrl(
-  url,
-  { width = 960 } = {}
-) {
-  if (!isCloudinaryUrl(url)) {
-    return url;
-  }
-
-  const bitrate =
-    getBitrateForWidth(width);
-
-  return url.replace(
-    "/upload/",
-    `/upload/q_auto:eco,f_auto,w_${width},vc_auto,br_${bitrate}/`
-  );
-}
-
-function getVideoPosterUrl(
-  url,
-  { width = 960 } = {}
-) {
-  if (!isCloudinaryUrl(url)) {
-    return null;
-  }
-
-  return url
-    .replace(
-      "/upload/",
-      `/upload/q_auto,f_jpg,w_${width},so_1/`
-    )
-    .replace(
-      /\.\w+($|\?)/,
-      ".jpg$1"
-    );
-}
-
-function getCloudinaryOrigin(url) {
-  if (!url || typeof url !== "string") {
-    return null;
-  }
-
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
-
-// --------------------------------------------------------------------
-// CONNECTION WARM-UP
-// --------------------------------------------------------------------
-
-function useCloudinaryPreconnect(url) {
   useEffect(() => {
-    const origin =
-      getCloudinaryOrigin(url);
+    const video =
+      videoRef.current;
 
-    if (
-      !origin ||
-      typeof document === "undefined"
-    ) {
+    if (!video || !source) {
       return;
     }
 
-    const marker = `link[data-cloudinary-preconnect="${origin}"]`;
-
-    if (
-      document.head.querySelector(marker)
-    ) {
-      return;
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
 
-    const links = [];
+    video.pause();
 
-    const preconnect =
-      document.createElement("link");
+    video.removeAttribute("src");
+    video.load();
 
-    preconnect.rel = "preconnect";
-    preconnect.href = origin;
+    // Safari / browsers with native HLS support
+    if (
+      video.canPlayType(
+        "application/vnd.apple.mpegurl"
+      )
+    ) {
+      video.src = source;
+      video.load();
 
-    preconnect.setAttribute(
-      "data-cloudinary-preconnect",
-      origin
-    );
+      return () => {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
+    }
 
-    links.push(preconnect);
+    // Chrome / Firefox / Edge via hls.js
+    if (
+      Hls.isSupported()
+    ) {
+            const hls =
+        new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 30,
+          capLevelToPlayerSize: false,
+          startLevel: -1,
+        });
 
-    const preconnectCors =
-      document.createElement("link");
+      hlsRef.current = hls;
 
-    preconnectCors.rel = "preconnect";
-    preconnectCors.href = origin;
-    preconnectCors.crossOrigin =
-      "anonymous";
+      hls.on(
+        Hls.Events.MANIFEST_PARSED,
+        () => {
+          if (
+            hls.levels &&
+            hls.levels.length > 0
+          ) {
+            hls.currentLevel =
+              hls.levels.length - 1;
+          }
+        }
+      );
 
-    preconnectCors.setAttribute(
-      "data-cloudinary-preconnect",
-      origin
-    );
+      hls.loadSource(source);
+      hls.attachMedia(video);
 
-    links.push(preconnectCors);
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
 
-    const dnsPrefetch =
-      document.createElement("link");
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
+    }
 
-    dnsPrefetch.rel = "dns-prefetch";
-    dnsPrefetch.href = origin;
-
-    dnsPrefetch.setAttribute(
-      "data-cloudinary-preconnect",
-      origin
-    );
-
-    links.push(dnsPrefetch);
-
-    links.forEach((link) =>
-      document.head.appendChild(link)
-    );
-  }, [url]);
+    return () => {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [
+    videoRef,
+    source,
+  ]);
 }
 
 // ----------------------------------------------------------------------
@@ -853,43 +765,6 @@ function WorkCard({
     [video]
   );
 
-  const videoWidth =
-    isMobile
-      ? 640
-      : 960;
-
-  const optimizedVideoUrl =
-    useMemo(
-      () =>
-        getOptimizedVideoUrl(
-          rawUrl,
-          {
-            width:
-              videoWidth,
-          }
-        ),
-      [
-        rawUrl,
-        videoWidth,
-      ]
-    );
-
-  const posterUrl =
-    useMemo(
-      () =>
-        getVideoPosterUrl(
-          rawUrl,
-          {
-            width:
-              videoWidth,
-          }
-        ),
-      [
-        rawUrl,
-        videoWidth,
-      ]
-    );
-
   // --------------------------------------------------
   // RESET VIDEO ERROR WHEN PROJECT CHANGES
   // --------------------------------------------------
@@ -900,13 +775,22 @@ function WorkCard({
   }, [rawUrl]);
 
   // --------------------------------------------------
+  // HLS PLAYBACK
+  // --------------------------------------------------
+
+  useHlsVideo(
+    videoRef,
+    videoUrl
+  );
+
+  // --------------------------------------------------
   // LOAD VIDEO
   // --------------------------------------------------
 
   const loadVideo =
     useCallback(
       async () => {
-        if (!optimizedVideoUrl) {
+        if (!rawUrl) {
           return null;
         }
 
@@ -916,13 +800,13 @@ function WorkCard({
 
         setHasVideoError(false);
         setVideoUrl(
-          optimizedVideoUrl
+          rawUrl
         );
 
-        return optimizedVideoUrl;
+        return rawUrl;
       },
       [
-        optimizedVideoUrl,
+        rawUrl,
         videoUrl,
       ]
     );
@@ -934,14 +818,14 @@ function WorkCard({
   useEffect(() => {
     if (
       !priority ||
-      !optimizedVideoUrl ||
+      !rawUrl ||
       typeof document ===
         "undefined"
     ) {
       return;
     }
 
-    const marker = `link[data-video-preload="${optimizedVideoUrl}"]`;
+    const marker = `link[data-video-preload="${rawUrl}"]`;
 
     if (
       document.head.querySelector(
@@ -963,11 +847,11 @@ function WorkCard({
       "video";
 
     preloadLink.href =
-      optimizedVideoUrl;
+      rawUrl;
 
     preloadLink.setAttribute(
       "data-video-preload",
-      optimizedVideoUrl
+      rawUrl
     );
 
     document.head.appendChild(
@@ -979,7 +863,7 @@ function WorkCard({
     };
   }, [
     priority,
-    optimizedVideoUrl,
+    rawUrl,
   ]);
 
   // --------------------------------------------------
@@ -988,22 +872,13 @@ function WorkCard({
 
   const handleVideoError =
     useCallback(() => {
-      if (
-        !rawUrl ||
-        !videoUrl
-      ) {
+      if (!rawUrl) {
         return;
       }
 
-      if (
-        videoUrl !== rawUrl
-      ) {
-        setHasVideoError(true);
-        setVideoUrl(rawUrl);
-      }
+      setHasVideoError(true);
     }, [
       rawUrl,
-      videoUrl,
     ]);
 
   // --------------------------------------------------
@@ -1193,13 +1068,13 @@ function WorkCard({
   // --------------------------------------------------
 
   useEffect(() => {
-    if (!optimizedVideoUrl) {
+    if (!rawUrl) {
       return;
     }
 
     loadVideo();
   }, [
-    optimizedVideoUrl,
+    rawUrl,
     loadVideo,
   ]);
 
@@ -1269,11 +1144,6 @@ function WorkCard({
         {videoUrl ? (
           <video
             ref={videoRef}
-            src={videoUrl}
-            poster={
-              posterUrl ||
-              undefined
-            }
             loop
             muted
             playsInline
@@ -1287,31 +1157,6 @@ function WorkCard({
             }
             onTimeUpdate={
               handleTimeUpdate
-            }
-            className="
-              block
-              w-full
-              h-full
-              object-cover
-              brightness-90
-              contrast-105
-            "
-          />
-        ) : posterUrl ? (
-          <img
-            src={posterUrl}
-            alt=""
-            aria-hidden="true"
-            loading={
-              priority
-                ? "eager"
-                : "lazy"
-            }
-            decoding="async"
-            fetchPriority={
-              priority
-                ? "high"
-                : "low"
             }
             className="
               block
@@ -1858,6 +1703,9 @@ export default function AllWorksSection() {
   const noiseRef =
     useRef(null);
 
+  const bgHlsRef =
+    useRef(null);
+
   const [viewMode, setViewMode] =
     useState("grid");
 
@@ -1886,19 +1734,6 @@ export default function AllWorksSection() {
     selectedClient,
     setSelectedClient,
   ] = useState("ALL");
-
-  const firstProjectVideo =
-    useMemo(
-      () =>
-        getHeroVideoUrl(
-          projects?.[0]
-        ),
-      [projects]
-    );
-
-  useCloudinaryPreconnect(
-    firstProjectVideo
-  );
 
   const [canHover, setCanHover] =
     useState(false);
@@ -1935,6 +1770,13 @@ export default function AllWorksSection() {
             );
 
             bgVideoRef.current.load();
+          }
+
+          if (
+            bgHlsRef.current
+          ) {
+            bgHlsRef.current.destroy();
+            bgHlsRef.current = null;
           }
         }
       };
@@ -2277,32 +2119,40 @@ export default function AllWorksSection() {
       return;
     }
 
-    const rawSource =
+    const source =
       getHeroVideoUrl(
         displayProject
       );
 
-    const source =
-      getOptimizedVideoUrl(
-        rawSource,
-        {
-          width: 1280,
-        }
-      );
+    const video =
+      bgVideoRef.current;
 
     if (
-      source &&
-      bgVideoRef.current
+      !source ||
+      !video
     ) {
-      const video =
-        bgVideoRef.current;
+      return;
+    }
 
-      if (
-        video.src !== source
-      ) {
-        video.src = source;
-        video.load();
-      }
+    if (bgHlsRef.current) {
+      bgHlsRef.current.destroy();
+      bgHlsRef.current = null;
+    }
+
+    video.pause();
+    video.removeAttribute(
+      "src"
+    );
+    video.load();
+
+    // Safari / native HLS
+    if (
+      video.canPlayType(
+        "application/vnd.apple.mpegurl"
+      )
+    ) {
+      video.src = source;
+      video.load();
 
       const playPromise =
         video.play();
@@ -2315,7 +2165,59 @@ export default function AllWorksSection() {
           () => {}
         );
       }
+
+      return;
     }
+
+    // Chrome / Edge / Firefox
+    if (
+      Hls.isSupported()
+    ) {
+      const hls =
+        new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 30,
+        });
+
+      bgHlsRef.current =
+        hls;
+
+      hls.loadSource(source);
+      hls.attachMedia(video);
+
+      hls.on(
+        Hls.Events.MANIFEST_PARSED,
+        () => {
+          const playPromise =
+            video.play();
+
+          if (
+            playPromise !==
+            undefined
+          ) {
+            playPromise.catch(
+              () => {}
+            );
+          }
+        }
+      );
+    }
+
+    return () => {
+      if (
+        bgHlsRef.current
+      ) {
+        bgHlsRef.current.destroy();
+        bgHlsRef.current = null;
+      }
+
+      video.pause();
+      video.removeAttribute(
+        "src"
+      );
+      video.load();
+    };
   }, [
     displayProject,
     hoveredProject,
@@ -2460,17 +2362,9 @@ export default function AllWorksSection() {
           {displayProject && (
             <>
               {(() => {
-                const rawSource =
+                const source =
                   getHeroVideoUrl(
                     displayProject
-                  );
-
-                const source =
-                  getOptimizedVideoUrl(
-                    rawSource,
-                    {
-                      width: 1280,
-                    }
                   );
 
                 return source ? (
@@ -2481,7 +2375,6 @@ export default function AllWorksSection() {
                     ref={
                       bgVideoRef
                     }
-                    src={source}
                     autoPlay
                     muted
                     loop

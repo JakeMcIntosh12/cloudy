@@ -38,10 +38,10 @@ const WEDDINGS_QUERY = groq`
     _id,
     title,
     year,
+
     "videos": videos[]{
       _key,
-      "url": asset->url,
-      "originalFilename": asset->originalFilename
+      "url": url
     }
   }
 `;

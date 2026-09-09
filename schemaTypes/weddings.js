@@ -22,12 +22,47 @@ export default {
     {
       name: "videos",
       title: "Wedding Videos",
+      description:
+        "Paste the Bunny Stream HLS playlist URL for each wedding video.",
       type: "array",
       of: [
         {
-          type: "file",
-          options: {
-            accept: "video/*",
+          type: "object",
+          name: "weddingVideo",
+          title: "Wedding Video",
+          fields: [
+            {
+              name: "url",
+              title: "Bunny Video URL",
+              description:
+                "Paste the Bunny Stream HLS playlist URL ending in /playlist.m3u8",
+              type: "url",
+              validation: (Rule) =>
+                Rule.required().custom((value) => {
+                  if (!value) return true;
+
+                  if (
+                    !value.includes(".b-cdn.net/") ||
+                    !value.includes("/playlist.m3u8")
+                  ) {
+                    return "Please enter a valid Bunny Stream HLS playlist URL.";
+                  }
+
+                  return true;
+                }),
+            },
+          ],
+
+          preview: {
+            select: {
+              url: "url",
+            },
+            prepare({ url }) {
+              return {
+                title: "Bunny Video",
+                subtitle: url || "No Bunny URL",
+              };
+            },
           },
         },
       ],

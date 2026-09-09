@@ -3,7 +3,6 @@
 import Controls from '@/components/UI/Controls'
 import Navigation from '@/components/UI/Navigation'
 import HeroCanvas from '@/components/react-three/HeroCanvas'
-import { client } from '@/lib/client'
 
 import React, {
   useState,
@@ -23,37 +22,14 @@ import gsap from 'gsap'
 const INTERACTION_GUIDE_VIDEO = '/Images/guide.mp4'
 
 // =========================================================
-// HELPER TO OPTIMIZE CLOUDINARY URLS SPECIFICALLY FOR
-// MOBILE DEVICES
+// BUNNY HERO VIDEO
 // =========================================================
 
-const getMobileOptimizedUrl = (url) => {
-  if (!url) return url
-
-  if (
-    typeof window !== 'undefined' &&
-    window.innerWidth <= 768
-  ) {
-    return url.replace(
-      '/upload/',
-      '/upload/q_auto,f_auto,w_720,vc_h264/'
-    )
-  }
-
-  return url
-}
+const BUNNY_HERO_VIDEO =
+  'https://vz-2f82c8b0-a77.b-cdn.net/acde3faa-cb8c-4921-a740-4df8fa036619/playlist.m3u8'
 
 const BOTTOM_TEXT =
   "VISUAL STUDIO FOR HIGH-END ARCHITECTURE AND CONSTRUCTION BASED IN ADELAIDE"
-
-const HOME_CONTENT_QUERY = `
-  *[
-    _type == "homeContent"
-  ][0]
-  {
-    "heroVideo": heroVideo.asset->url
-  }
-`
 
 function Home() {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -61,12 +37,6 @@ function Home() {
   const [nextIndex, setNextIndex] = useState(null)
 
   const [isTransitioning, setIsTransitioning] = useState(false)
-
-  // =========================================================
-  // SANITY HERO VIDEO
-  // =========================================================
-
-  const [heroVideo, setHeroVideo] = useState(null)
 
   // Video duration
   const [duration, setDuration] = useState('00:00')
@@ -125,64 +95,17 @@ function Home() {
   const interactionGuideShownRef = useRef(false)
 
   // =========================================================
-  // FETCH HERO VIDEO FROM SANITY
-  // =========================================================
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function fetchHomeContent() {
-      try {
-        const data = await client.fetch(
-          HOME_CONTENT_QUERY,
-          {},
-          {
-            next: {
-              revalidate: 60,
-            },
-          }
-        )
-
-        if (cancelled) return
-
-        setHeroVideo(
-          data?.heroVideo || null
-        )
-      } catch (error) {
-        console.error(
-          'Failed to fetch Home content from Sanity:',
-          error
-        )
-
-        if (!cancelled) {
-          setHeroVideo(null)
-        }
-      }
-    }
-
-    fetchHomeContent()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // =========================================================
   // PROCESS PROJECT VIDEO URL
   // =========================================================
 
   const PROJECTS = useMemo(() => {
-    if (!heroVideo) {
-      return []
-    }
-
     return [
       {
-        src: getMobileOptimizedUrl(heroVideo),
+        src: BUNNY_HERO_VIDEO,
         title: 'THE BUILDING COMPANY'
       }
     ]
-  }, [heroVideo])
+  }, [])
 
   // =========================================================
   // SPLIT SENTENCE INTO WORDS

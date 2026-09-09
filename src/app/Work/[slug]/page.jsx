@@ -75,20 +75,9 @@ const PROJECT_QUERY = `
       name,
       role
     },
-    heroVideos[]{
+        heroVideos[]{
       _key,
-      sourceType,
-      url,
-      video{
-        asset->{
-          _id,
-          url
-        }
-      },
-      "src": coalesce(
-        url,
-        video.asset->url
-      )
+      "src": videoUrl
     },
     gallery[]{
       _key,
