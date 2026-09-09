@@ -13,6 +13,9 @@ export default function Page() {
       touchMultiplier: 2,
     })
 
+    // expose so GlobalCinematicFog can read the real scroll value
+    window.__lenis = lenis
+
     let frameId
 
     function raf(time) {
@@ -26,6 +29,7 @@ export default function Page() {
     return () => {
       cancelAnimationFrame(frameId)
       lenis.destroy()
+      window.__lenis = null
     }
   }, [])
 

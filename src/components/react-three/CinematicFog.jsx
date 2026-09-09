@@ -128,6 +128,20 @@ function RadialVaporRing() {
 
   useEffect(() => {
     const updateDocHeight = () => {
+      const lenisInstance =
+        typeof window !== "undefined"
+          ? window.__lenis
+          : null;
+
+      if (
+        lenisInstance &&
+        typeof lenisInstance.limit === "number" &&
+        lenisInstance.limit > 0
+      ) {
+        docHeightRef.current = lenisInstance.limit;
+        return;
+      }
+
       if (typeof document !== "undefined") {
         const docElement = document.documentElement;
 
@@ -448,6 +462,11 @@ export default function GlobalCinematicFog() {
         minHeight: "100dvh",
         pointerEvents: "none",
         touchAction: "none",
+        transform: "translateZ(0)",
+        WebkitTransform: "translate3d(0,0,0)",
+        willChange: "transform",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
       }}
     >
       <WebGLSceneErrorBoundary key={canvasKey}>
