@@ -26,6 +26,7 @@ import Navigation from "@/components/UI/Navigation";
 import { groq } from "next-sanity";
 import { client } from "@/lib/client";
 import BottomContent from "@/components/Sections/SmallFooter";
+import Hls from "hls.js";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
@@ -38,7 +39,6 @@ const WEDDINGS_QUERY = groq`
     _id,
     title,
     year,
-
     "videos": videos[]{
       _key,
       "url": url
@@ -73,7 +73,66 @@ const getMediaUrl = (media) => {
 };
 
 /* ============================================================
-   3. ANALOG TV NOISE SHADER
+   3. HLS HELPERS
+============================================================ */
+
+const isHlsUrl = (url) => {
+  if (!url || typeof url !== "string") return false;
+
+  return (
+    url.includes(".m3u8") ||
+    url.includes("playlist.m3u8")
+  );
+};
+
+const attachVideoSource = (video, url) => {
+  if (!video || !url) return null;
+
+  let hls = null;
+
+  /*
+   * Safari / browsers with native HLS support
+   */
+  if (
+    video.canPlayType(
+      "application/vnd.apple.mpegurl"
+    )
+  ) {
+    video.src = url;
+    video.load();
+
+    return null;
+  }
+
+  /*
+   * Chrome / Edge / Firefox using HLS.js
+   */
+  if (isHlsUrl(url) && Hls.isSupported()) {
+    hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false,
+      backBufferLength: 30,
+      maxBufferLength: 20,
+      maxMaxBufferLength: 40,
+    });
+
+    hls.loadSource(url);
+    hls.attachMedia(video);
+
+    return hls;
+  }
+
+  /*
+   * Normal MP4 / fallback
+   */
+  video.src = url;
+  video.load();
+
+  return null;
+};
+
+/* ============================================================
+   4. ANALOG TV NOISE SHADER
 ============================================================ */
 
 const noiseShaderDefinition = {
@@ -142,8 +201,11 @@ function TVNoisePlane({ opacityRef }) {
           uOpacity: { value: 0 },
         },
 
-        vertexShader: noiseShaderDefinition.vertexShader,
-        fragmentShader: noiseShaderDefinition.fragmentShader,
+        vertexShader:
+          noiseShaderDefinition.vertexShader,
+
+        fragmentShader:
+          noiseShaderDefinition.fragmentShader,
 
         transparent: true,
         depthTest: false,
@@ -217,54 +279,58 @@ const R3FTVNoise = forwardRef((props, ref) => {
 R3FTVNoise.displayName = "R3FTVNoise";
 
 /* ============================================================
-   4. SMALL BUTTON
+   5. SMALL BUTTON
 ============================================================ */
 
-const SmallButton = forwardRef(({ isOpen = false }, ref) => {
-  const buttonRef = useRef(null);
+const SmallButton = forwardRef(
+  ({ isOpen = false }, ref) => {
+    const buttonRef = useRef(null);
 
-  useImperativeHandle(ref, () => ({
-    triggerBlur: () => {
-      if (!buttonRef.current) return;
+    useImperativeHandle(ref, () => ({
+      triggerBlur: () => {
+        if (!buttonRef.current) return;
 
-      gsap.killTweensOf(buttonRef.current);
+        gsap.killTweensOf(buttonRef.current);
 
-      gsap.fromTo(
-        buttonRef.current,
-        {
-          filter: "blur(22px) brightness(1.5)",
-          scale: 0.92,
-          opacity: 0.5,
-        },
-        {
-          filter: "blur(0px) brightness(1)",
-          scale: 1,
-          opacity: 1,
-          duration: 0.45,
-          ease: "back.out(1.7)",
-        }
-      );
-    },
-  }));
+        gsap.fromTo(
+          buttonRef.current,
+          {
+            filter:
+              "blur(22px) brightness(1.5)",
+            scale: 0.92,
+            opacity: 0.5,
+          },
+          {
+            filter:
+              "blur(0px) brightness(1)",
+            scale: 1,
+            opacity: 1,
+            duration: 0.45,
+            ease: "back.out(1.7)",
+          }
+        );
+      },
+    }));
 
-  return (
-    <div
-      ref={buttonRef}
-      className={`font-mono tracking-tight text-[clamp(0.6875rem,0.9vw,0.75rem)] border transition-colors duration-300 rounded-full w-[clamp(6.5rem,10vw,6.6875rem)] h-[clamp(1.75rem,2.5vw,2rem)] px-3 py-1 flex items-center justify-center text-center cursor-pointer select-none ${
-        isOpen
-          ? "bg-ghost-white text-carbon-black border-ghost-white hover:bg-zinc-300"
-          : "bg-carbon-black text-ghost-white border-eclipse hover:bg-carbon-black hover:text-ghost-white hover:border-eclipse"
-      }`}
-    >
-      {isOpen ? "CLOSE" : "WATCH FILM"}
-    </div>
-  );
-});
+    return (
+      <div
+        ref={buttonRef}
+        className={`font-mono tracking-tight text-[clamp(0.6875rem,0.9vw,0.75rem)] border transition-colors duration-300 rounded-full w-[clamp(6.5rem,10vw,6.6875rem)] h-[clamp(1.75rem,2.5vw,2rem)] px-3 py-1 flex items-center justify-center text-center cursor-pointer select-none ${
+          isOpen
+            ? "bg-ghost-white text-carbon-black border-ghost-white hover:bg-zinc-300"
+            : "bg-carbon-black text-ghost-white border-eclipse hover:bg-carbon-black hover:text-ghost-white hover:border-eclipse"
+        }`}
+      >
+        {isOpen ? "CLOSE" : "WATCH FILM"}
+      </div>
+    );
+  }
+);
 
 SmallButton.displayName = "SmallButton";
 
 /* ============================================================
-   5. WEDDING CARD
+   6. WEDDING CARD
 ============================================================ */
 
 function WorkCard({
@@ -274,20 +340,74 @@ function WorkCard({
   onHoverChange,
   onOpen,
 }) {
-  const [currentTime, setCurrentTime] = useState("00:00");
+  const [currentTime, setCurrentTime] =
+    useState("00:00");
 
   const containerRef = useRef(null);
   const buttonRef = useRef(null);
   const noiseRef = useRef(null);
   const videoRef = useRef(null);
+  const hlsRef = useRef(null);
 
   const previewVideo = wedding?.videos?.[0];
   const previewUrl = getMediaUrl(previewVideo);
 
+  /*
+   * Attach the video source correctly.
+   *
+   * This is the important fix for Bunny .m3u8 videos.
+   */
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video || !previewUrl) return;
+
+    /*
+     * Clean up any previous HLS instance.
+     */
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    video.pause();
+
+    /*
+     * Remove any previous source.
+     */
+    video.removeAttribute("src");
+    video.load();
+
+    /*
+     * Attach the new source.
+     */
+    const hls = attachVideoSource(
+      video,
+      previewUrl
+    );
+
+    hlsRef.current = hls;
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [previewUrl]);
+
   const handleLoadedMetadata = (e) => {
     const videoEl = e.currentTarget;
 
-    if (videoEl && videoEl.duration) {
+    if (
+      videoEl &&
+      Number.isFinite(videoEl.duration) &&
+      videoEl.duration > 0
+    ) {
       videoEl.currentTime =
         Math.random() * videoEl.duration;
     }
@@ -340,7 +460,9 @@ function WorkCard({
     });
 
     if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
+      videoRef.current
+        .play()
+        .catch(() => {});
     }
 
     if (buttonRef.current?.triggerBlur) {
@@ -354,16 +476,24 @@ function WorkCard({
     if (!containerRef.current) return;
 
     const topL =
-      containerRef.current.querySelector(".corner-tl");
+      containerRef.current.querySelector(
+        ".corner-tl"
+      );
 
     const topR =
-      containerRef.current.querySelector(".corner-tr");
+      containerRef.current.querySelector(
+        ".corner-tr"
+      );
 
     const botL =
-      containerRef.current.querySelector(".corner-bl");
+      containerRef.current.querySelector(
+        ".corner-bl"
+      );
 
     const botR =
-      containerRef.current.querySelector(".corner-br");
+      containerRef.current.querySelector(
+        ".corner-br"
+      );
 
     gsap.to(topL, {
       opacity: 0,
@@ -443,12 +573,13 @@ function WorkCard({
       >
         <video
           ref={videoRef}
-          src={previewUrl}
           loop
           muted
           playsInline
           preload="metadata"
-          onLoadedMetadata={handleLoadedMetadata}
+          onLoadedMetadata={
+            handleLoadedMetadata
+          }
           onTimeUpdate={handleTimeUpdate}
           className="w-full h-full object-cover brightness-90 contrast-105 transition-[filter] duration-500 ease-out"
         />
@@ -489,7 +620,7 @@ function WorkCard({
 }
 
 /* ============================================================
-   6. LIST ROW
+   7. LIST ROW
 ============================================================ */
 
 function ListItemRow({
@@ -556,28 +687,6 @@ function ListItemRow({
     });
   }, [onHoverEnd]);
 
-  /* MOBILE SCROLL ACTIVATION */
-
-  useEffect(() => {
-    const mm = gsap.matchMedia();
-
-    mm.add("(max-width: 767px)", () => {
-      const st = ScrollTrigger.create({
-        trigger: rowRef.current,
-        start: "top 50%",
-        end: "bottom 50%",
-        onEnter: activateRow,
-        onEnterBack: activateRow,
-        onLeave: deactivateRow,
-        onLeaveBack: deactivateRow,
-      });
-
-      return () => st.kill();
-    });
-
-    return () => mm.revert();
-  }, [activateRow, deactivateRow]);
-
   return (
     <div
       ref={rowRef}
@@ -593,7 +702,8 @@ function ListItemRow({
           ref={titleRef}
           className="font-serif text-sm md:text-xl font-light uppercase text-ghost-white inline-block"
         >
-          {wedding.title || "UNTITLED WEDDING"}
+          {wedding.title ||
+            "UNTITLED WEDDING"}
         </span>
 
         {/* YEAR */}
@@ -610,7 +720,7 @@ function ListItemRow({
 }
 
 /* ============================================================
-   7. MAIN WEDDINGS PAGE
+   8. MAIN WEDDINGS PAGE
 ============================================================ */
 
 export default function WeddingsSection() {
@@ -618,18 +728,37 @@ export default function WeddingsSection() {
   const containerRef = useRef(null);
   const listPreviewRef = useRef(null);
   const listContainerRef = useRef(null);
+
   const bgVideoRef = useRef(null);
+  const bgHlsRef = useRef(null);
+
   const introRef = useRef(null);
 
-  const [weddings, setWeddings] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(null);
-  const [viewMode, setViewMode] = useState("grid");
-  const [visibleCount, setVisibleCount] = useState(13);
-  const [hoveredProject, setHoveredProject] = useState(null);
-  const [displayProject, setDisplayProject] = useState(null);
-  const [isHoveringVideo, setIsHoveringVideo] =
-    useState(false);
+  const [weddings, setWeddings] =
+    useState([]);
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [fetchError, setFetchError] =
+    useState(null);
+
+  const [viewMode, setViewMode] =
+    useState("grid");
+
+  const [visibleCount, setVisibleCount] =
+    useState(13);
+
+  const [hoveredProject, setHoveredProject] =
+    useState(null);
+
+  const [displayProject, setDisplayProject] =
+    useState(null);
+
+  const [
+    isHoveringVideo,
+    setIsHoveringVideo,
+  ] = useState(false);
 
   /* VIDEO PLAYER STATE */
 
@@ -639,7 +768,9 @@ export default function WeddingsSection() {
   const [isPlayerOpen, setIsPlayerOpen] =
     useState(false);
 
-  /* FETCH WEDDINGS */
+  /* ============================================================
+     FETCH WEDDINGS
+  ============================================================ */
 
   useEffect(() => {
     let cancelled = false;
@@ -661,29 +792,45 @@ export default function WeddingsSection() {
 
         if (cancelled) return;
 
-        const formattedWeddings = Array.isArray(data)
-          ? data
-              .map((wedding) => ({
-                ...wedding,
+        const formattedWeddings =
+          Array.isArray(data)
+            ? data
+                .map((wedding) => ({
+                  ...wedding,
 
-                videos: Array.isArray(wedding.videos)
-                  ? wedding.videos
-                      .slice(0, 5)
-                      .map((video) => ({
-                        ...video,
-                        url: getMediaUrl(video),
-                      }))
-                      .filter((video) => video.url)
-                  : [],
-              }))
-              .filter(
-                (wedding) =>
-                  wedding.title &&
-                  wedding.videos?.length > 0
-              )
-          : [];
+                  videos:
+                    Array.isArray(
+                      wedding.videos
+                    )
+                      ? wedding.videos
+                          .map((video) => ({
+                            ...video,
+                            url: getMediaUrl(
+                              video
+                            ),
+                          }))
+                          .filter(
+                            (video) =>
+                              video.url
+                          )
+                      : [],
+                }))
+                .filter(
+                  (wedding) =>
+                    wedding.title &&
+                    wedding.videos?.length >
+                      0
+                )
+            : [];
 
-        setWeddings(formattedWeddings);
+        console.log(
+          "WEDDINGS FROM SANITY:",
+          formattedWeddings
+        );
+
+        setWeddings(
+          formattedWeddings
+        );
       } catch (error) {
         console.error(
           "Failed to fetch weddings from Sanity:",
@@ -711,7 +858,9 @@ export default function WeddingsSection() {
     };
   }, []);
 
-  /* INTRO SPLIT TEXT REVEAL */
+  /* ============================================================
+     INTRO SPLIT TEXT REVEAL
+  ============================================================ */
 
   useLayoutEffect(() => {
     if (!introRef.current) return;
@@ -721,7 +870,8 @@ export default function WeddingsSection() {
         introRef.current,
         {
           type: "lines",
-          linesClass: "intro-split-line",
+          linesClass:
+            "intro-split-line",
         }
       );
 
@@ -765,8 +915,18 @@ export default function WeddingsSection() {
   }, []);
 
   const activeProjects = useMemo(() => {
-    return weddings.slice(0, visibleCount);
-  }, [weddings, visibleCount]);
+    return weddings.slice(
+      0,
+      visibleCount
+    );
+  }, [
+    weddings,
+    visibleCount,
+  ]);
+
+  /* ============================================================
+     PLAYER
+  ============================================================ */
 
   const openPlayer = useCallback(
     (wedding) => {
@@ -784,6 +944,10 @@ export default function WeddingsSection() {
     }, 300);
   }, []);
 
+  /* ============================================================
+     VIEW TOGGLE
+  ============================================================ */
+
   const handleToggleView = (mode) => {
     if (mode === viewMode) return;
 
@@ -797,18 +961,25 @@ export default function WeddingsSection() {
         onComplete: () => {
           setViewMode(mode);
 
-          gsap.to(containerRef.current, {
-            opacity: 1,
-            y: 0,
-            duration: 0.35,
-            ease: "power2.out",
-          });
+          gsap.to(
+            containerRef.current,
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.35,
+              ease: "power2.out",
+            }
+          );
         },
       });
     } else {
       setViewMode(mode);
     }
   };
+
+  /* ============================================================
+     LOAD MORE
+  ============================================================ */
 
   const handleLoadMore = () => {
     setVisibleCount((prev) =>
@@ -819,44 +990,161 @@ export default function WeddingsSection() {
     );
   };
 
+  /* ============================================================
+     SCROLL TRIGGER REFRESH
+  ============================================================ */
+
   useEffect(() => {
     const timer = setTimeout(() => {
       ScrollTrigger.refresh();
     }, 150);
 
-    return () => clearTimeout(timer);
+    return () =>
+      clearTimeout(timer);
   }, [
     viewMode,
     visibleCount,
     weddings,
   ]);
 
+  /* ============================================================
+     HOVERED PROJECT
+  ============================================================ */
+
   useEffect(() => {
     if (hoveredProject) {
-      setDisplayProject(hoveredProject);
+      setDisplayProject(
+        hoveredProject
+      );
     }
   }, [hoveredProject]);
 
+  /* ============================================================
+     FULLSCREEN HOVER VIDEO
+  ============================================================ */
+
   useEffect(() => {
+    const video = bgVideoRef.current;
+
+    const url = getMediaUrl(
+      displayProject?.videos?.[0]
+    );
+
+    if (!video || !url) return;
+
+    /*
+     * Destroy old HLS instance.
+     */
+
+    if (bgHlsRef.current) {
+      bgHlsRef.current.destroy();
+      bgHlsRef.current = null;
+    }
+
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+
+    /*
+     * Native HLS.
+     */
+
     if (
-      !hoveredProject ||
-      !bgVideoRef.current
+      video.canPlayType(
+        "application/vnd.apple.mpegurl"
+      )
     ) {
-      return;
+      video.src = url;
+      video.load();
+
+      video
+        .play()
+        .catch(() => {});
+
+      return () => {
+        video.pause();
+        video.removeAttribute(
+          "src"
+        );
+        video.load();
+      };
     }
 
-    const playPromise =
-      bgVideoRef.current.play();
+    /*
+     * HLS.js.
+     */
 
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {});
+    if (
+      isHlsUrl(url) &&
+      Hls.isSupported()
+    ) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 40,
+      });
+
+      bgHlsRef.current = hls;
+
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+      hls.on(
+        Hls.Events.MANIFEST_PARSED,
+        () => {
+          if (hoveredProject) {
+            video
+              .play()
+              .catch(() => {});
+          }
+        }
+      );
+
+      return () => {
+        hls.destroy();
+
+        if (
+          bgHlsRef.current === hls
+        ) {
+          bgHlsRef.current = null;
+        }
+
+        video.pause();
+        video.removeAttribute(
+          "src"
+        );
+        video.load();
+      };
     }
+
+    /*
+     * Normal MP4 fallback.
+     */
+
+    video.src = url;
+    video.load();
+
+    video
+      .play()
+      .catch(() => {});
+
+    return () => {
+      video.pause();
+      video.removeAttribute(
+        "src"
+      );
+      video.load();
+    };
   }, [
     displayProject,
     hoveredProject,
   ]);
 
-  /* LIST STAGGER */
+  /* ============================================================
+     LIST STAGGER
+  ============================================================ */
 
   useEffect(() => {
     if (
@@ -902,10 +1190,14 @@ export default function WeddingsSection() {
     activeProjects,
   ]);
 
-  /* CURSOR & PREVIEW TRACKING */
+  /* ============================================================
+     CURSOR & PREVIEW TRACKING
+  ============================================================ */
 
   useEffect(() => {
-    const cursor = cursorRef.current;
+    const cursor =
+      cursorRef.current;
+
     const preview =
       listPreviewRef.current;
 
@@ -977,16 +1269,26 @@ export default function WeddingsSection() {
           xToCursor &&
           yToCursor
         ) {
-          xToCursor(e.clientX);
-          yToCursor(e.clientY);
+          xToCursor(
+            e.clientX
+          );
+
+          yToCursor(
+            e.clientY
+          );
         }
 
         if (
           xToPreview &&
           yToPreview
         ) {
-          xToPreview(e.clientX);
-          yToPreview(e.clientY);
+          xToPreview(
+            e.clientX
+          );
+
+          yToPreview(
+            e.clientY
+          );
         }
       };
 
@@ -1006,7 +1308,9 @@ export default function WeddingsSection() {
     return () => ctx.revert();
   }, [viewMode]);
 
-  /* CURSOR VISIBILITY */
+  /* ============================================================
+     CURSOR VISIBILITY
+  ============================================================ */
 
   useEffect(() => {
     const cursor =
@@ -1036,7 +1340,9 @@ export default function WeddingsSection() {
     isHoveringVideo,
   ]);
 
-  /* PLAY VIDEO TAG */
+  /* ============================================================
+     PLAY VIDEO TAG
+  ============================================================ */
 
   useEffect(() => {
     const preview =
@@ -1063,7 +1369,9 @@ export default function WeddingsSection() {
     hoveredProject,
   ]);
 
-  /* VIDEO HOVER */
+  /* ============================================================
+     VIDEO HOVER
+  ============================================================ */
 
   const handleHoverChange =
     useCallback(
@@ -1075,7 +1383,9 @@ export default function WeddingsSection() {
       []
     );
 
-  /* LENIS */
+  /* ============================================================
+     LENIS
+  ============================================================ */
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -1124,9 +1434,7 @@ export default function WeddingsSection() {
 
   return (
     <>
-      {/* ========================================================
-          CUSTOM VIDEO PLAYER
-      ======================================================== */}
+      {/* CUSTOM VIDEO PLAYER */}
 
       <CustomVideoPlayer
         src={getMediaUrl(
@@ -1141,9 +1449,8 @@ export default function WeddingsSection() {
       />
 
       <div className="bg-black w-full min-h-screen py-6 px-4 md:py-2 md:px-4 relative overflow-hidden pb-2 md:pb-2">
-        {/* ======================================================
-            FULL-BLEED HOVER VIDEO BACKGROUND
-        ====================================================== */}
+
+        {/* FULL-BLEED HOVER VIDEO BACKGROUND */}
 
         <div
           className={`fixed inset-0 z-0 pointer-events-none overflow-hidden transition-opacity duration-500 ease-out ${
@@ -1158,10 +1465,6 @@ export default function WeddingsSection() {
                 displayProject._id
               }
               ref={bgVideoRef}
-              src={
-                displayProject
-                  .videos?.[0]?.url
-              }
               autoPlay
               muted
               loop
@@ -1184,7 +1487,8 @@ export default function WeddingsSection() {
             ref={introRef}
             className="font-sans tracking-tight text-[clamp(2rem,6vw,3rem)] md:text-[clamp(0.8rem,4vw,3rem)] w-[clamp(15rem,75vw,46.875rem)] text-ghost-white leading-tight"
           >
-            MOMENTS WORTH REMEMBERING
+            MOMENTS WORTH
+            REMEMBERING
           </h1>
         </div>
 
@@ -1213,10 +1517,10 @@ export default function WeddingsSection() {
         {/* HEADER */}
 
         <div className="relative z-10 flex flex-col space-y-6 pt-14 md:pt-10 lg:pt-30">
+
           <div className="flex flex-row items-center justify-between w-full text-zinc-300">
             <div className="opacity-0 font-geist-mono font-medium tracking-tight text-[clamp(0.5rem,0.8vw,0.625rem)] flex items-center gap-2">
               <div className="w-2 h-2 bg-zinc-300" />
-
               <h1>WEDDINGS</h1>
             </div>
 
@@ -1228,6 +1532,7 @@ export default function WeddingsSection() {
           {/* WORKS HEADER */}
 
           <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between w-full text-ghost-white gap-6 sm:gap-0 pb-6">
+
             <div className="flex flex-row items-start gap-4 sm:gap-6 font-monot">
               <h1 className="text-[clamp(5rem,15vw,16.875rem)] tracking-[-8%] font-light leading-none uppercase">
                 WORKS
@@ -1235,7 +1540,8 @@ export default function WeddingsSection() {
 
               <sup className="text-[clamp(1rem,2vw,1.875rem)] pt-1 sm:pt-6 leading-none font-sans font-medium tracking-tight">
                 [
-                {activeProjects.length < 10
+                {activeProjects.length <
+                10
                   ? `0${activeProjects.length}`
                   : activeProjects.length}
                 ]
@@ -1243,7 +1549,9 @@ export default function WeddingsSection() {
             </div>
 
             <div className="flex flex-col items-start sm:items-end justify-end space-y-4 w-full sm:w-auto">
+
               <div className="flex items-center space-x-3 font-geist-mono text-sm md:text-lg tracking-widest uppercase">
+
                 <button
                   onClick={() =>
                     handleToggleView(
@@ -1251,8 +1559,7 @@ export default function WeddingsSection() {
                     )
                   }
                   className={`transition-colors cursor-pointer ${
-                    viewMode ===
-                    "grid"
+                    viewMode === "grid"
                       ? "text-white font-bold"
                       : "text-zinc-500 hover:text-white"
                   }`}
@@ -1271,14 +1578,14 @@ export default function WeddingsSection() {
                     )
                   }
                   className={`transition-colors cursor-pointer ${
-                    viewMode ===
-                    "list"
+                    viewMode === "list"
                       ? "text-white font-bold"
                       : "text-zinc-500 hover:text-white"
                   }`}
                 >
                   LIST
                 </button>
+
               </div>
             </div>
           </div>
@@ -1289,6 +1596,7 @@ export default function WeddingsSection() {
             ref={containerRef}
             className="w-full transition-all duration-300"
           >
+
             {isLoading ? (
               <div className="w-full py-20 flex justify-center">
                 <p className="font-geist-mono text-xs tracking-widest uppercase text-zinc-500" />
@@ -1308,14 +1616,17 @@ export default function WeddingsSection() {
               </div>
             ) : viewMode ===
               "grid" ? (
+
               /* 5-VIDEO EDITORIAL GRID */
 
               <div className="flex flex-col space-y-8 lg:space-y-58 pt-6">
+
                 {/* VIDEO 01 + VIDEO 02 */}
 
                 {activeProjects.length >=
                   2 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-8 lg:gap-0 text-lavender">
+
                     <WorkCard
                       wedding={
                         activeProjects[0]
@@ -1341,6 +1652,7 @@ export default function WeddingsSection() {
                         openPlayer
                       }
                     />
+
                   </div>
                 )}
 
@@ -1367,6 +1679,7 @@ export default function WeddingsSection() {
                 {activeProjects.length >=
                   5 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-8 lg:gap-12 text-lavender pb-12 lg:pb-24 items-start">
+
                     <WorkCard
                       wedding={
                         activeProjects[3]
@@ -1393,6 +1706,7 @@ export default function WeddingsSection() {
                         openPlayer
                       }
                     />
+
                   </div>
                 )}
 
@@ -1401,6 +1715,7 @@ export default function WeddingsSection() {
                 {activeProjects.length >
                   5 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 w-full gap-8 lg:gap-12 text-lavender">
+
                     {activeProjects
                       .slice(5)
                       .map(
@@ -1424,10 +1739,13 @@ export default function WeddingsSection() {
                           />
                         )
                       )}
+
                   </div>
                 )}
+
               </div>
             ) : (
+
               /* LIST VIEW */
 
               <div
@@ -1436,9 +1754,11 @@ export default function WeddingsSection() {
                 }
                 className="relative w-full pt-8 pb-16"
               >
+
                 {/* TABLE HEADER */}
 
                 <div className="grid grid-cols-2 items-center text-zinc-500 font-geist-mono text-xs uppercase tracking-wider pb-4 border-b border-zinc-800">
+
                   <span className="text-left">
                     COUPLE
                   </span>
@@ -1446,11 +1766,13 @@ export default function WeddingsSection() {
                   <span className="text-right">
                     YEAR
                   </span>
+
                 </div>
 
                 {/* LIST ROWS */}
 
                 <div className="flex flex-col divide-y divide-zinc-800/60">
+
                   {activeProjects.map(
                     (wedding) => (
                       <ListItemRow
@@ -1474,6 +1796,7 @@ export default function WeddingsSection() {
                       />
                     )
                   )}
+
                 </div>
 
                 {/* LOAD MORE */}
@@ -1481,6 +1804,7 @@ export default function WeddingsSection() {
                 {visibleCount <
                   weddings.length && (
                   <div className="flex justify-center pt-12">
+
                     <button
                       onClick={
                         handleLoadMore
@@ -1489,18 +1813,20 @@ export default function WeddingsSection() {
                     >
                       LOAD MORE
                     </button>
+
                   </div>
                 )}
+
               </div>
             )}
+
           </div>
         </div>
 
-        {/* =================================================
-            BOTTOM CONTENT
-        ================================================= */}
+        {/* BOTTOM CONTENT */}
 
         <BottomContent />
+
       </div>
     </>
   );
