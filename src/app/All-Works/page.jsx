@@ -137,7 +137,7 @@ function useHlsVideo(videoRef, source) {
     if (
       Hls.isSupported()
     ) {
-            const hls =
+      const hls =
         new Hls({
           enableWorker: true,
           lowLatencyMode: false,
@@ -1935,9 +1935,17 @@ export default function AllWorksSection() {
     setVisibleCount(13);
   }, [selectedClient]);
 
+  // ------------------------------------------------------------------
+  // GRID REVEAL
+  //
+  // IMPORTANT:
+  // viewMode is intentionally NOT a dependency here.
+  // This prevents switching LIST -> GRID from resetting every
+  // WorkCard's animation state.
+  // ------------------------------------------------------------------
+
   useEffect(() => {
     if (
-      viewMode !== "grid" ||
       !containerRef.current ||
       !activeProjects.length
     ) {
@@ -1948,7 +1956,7 @@ export default function AllWorksSection() {
       gsap.context(() => {
         const cards =
           containerRef.current.querySelectorAll(
-            ".work-card-reveal"
+            ".grid-view .work-card-reveal"
           );
 
         if (!cards.length) {
@@ -1979,7 +1987,6 @@ export default function AllWorksSection() {
     return () =>
       ctx.revert();
   }, [
-    viewMode,
     activeProjects,
     selectedClient,
   ]);
@@ -2499,9 +2506,23 @@ export default function AllWorksSection() {
           ref={containerRef}
           className="w-full transition-all duration-300"
         >
-          {viewMode ===
-          "grid" ? (
-            <div className="flex flex-col space-y-8 lg:space-y-14 pt-4">
+          {/* ==========================================================
+              GRID VIEW
+
+              IMPORTANT:
+              This remains mounted even when LIST is selected.
+              It is only hidden with CSS, so WorkCard video/HLS
+              instances are preserved.
+             ========================================================== */}
+
+          <div
+            className={`grid-view ${
+              viewMode === "grid"
+                ? "block"
+                : "hidden"
+            }`}
+          >
+            <div className="flex flex-col space-y-8 lg:space-y-14 pt-4 pb-32 md:pb-1208">
               {activeProjects.length >
                 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-12 text-lavender">
@@ -2914,9 +2935,21 @@ export default function AllWorksSection() {
                 </div>
               )}
             </div>
-          ) : (
-            /* LIST VIEW — UNTOUCHED */
+          </div>
 
+          {/* ==========================================================
+              LIST VIEW
+
+              Also remains mounted. Only visibility changes.
+             ========================================================== */}
+
+          <div
+            className={`list-view ${
+              viewMode === "list"
+                ? "block"
+                : "hidden"
+            }`}
+          >
             <div
               ref={
                 listContainerRef
@@ -2992,7 +3025,7 @@ export default function AllWorksSection() {
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

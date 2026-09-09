@@ -343,7 +343,7 @@ function Footer() {
 
               <a
                 href="mailto:hello@cloudhausmedia.com"
-                className="hover:opacity-70 transition-opacity"
+                className="break-all hover:opacity-70 transition-opacity"
               >
                 hello@cloudhausmedia.com
               </a>
