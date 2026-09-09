@@ -151,13 +151,8 @@ function useHlsVideo(videoRef, source) {
       hls.on(
         Hls.Events.MANIFEST_PARSED,
         () => {
-          if (
-            hls.levels &&
-            hls.levels.length > 0
-          ) {
-            hls.currentLevel =
-              hls.levels.length - 1;
-          }
+          // Let hls.js choose the appropriate
+          // quality level automatically.
         }
       );
 
@@ -2522,7 +2517,7 @@ export default function AllWorksSection() {
                 : "hidden"
             }`}
           >
-            <div className="flex flex-col space-y-8 lg:space-y-14 pt-4 pb-32 md:pb-1208">
+            <div className="flex flex-col space-y-8 lg:space-y-14 pt-4 pb-32 md:pb-40">
               {activeProjects.length >
                 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 w-full gap-12 text-lavender">
