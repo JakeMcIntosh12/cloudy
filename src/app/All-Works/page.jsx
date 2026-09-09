@@ -217,9 +217,11 @@ function useHlsVideo(
 
       return () => {
         video.pause();
+
         video.removeAttribute(
           "src"
         );
+
         video.load();
       };
     }
@@ -927,19 +929,11 @@ function WorkCard({
       [video]
     );
 
-  // --------------------------------------------------
-  // RESOLVE HERO VIDEO
-  // --------------------------------------------------
-
   const rawUrl = useMemo(
     () =>
       getHeroVideoUrl(video),
     [video]
   );
-
-  // --------------------------------------------------
-  // RESOLVE BUNNY POSTER
-  // --------------------------------------------------
 
   const posterUrl = useMemo(
     () =>
@@ -986,7 +980,6 @@ function WorkCard({
         }
 
         setHasVideoError(false);
-
         setVideoReady(false);
 
         setVideoUrl(
@@ -1052,52 +1045,27 @@ function WorkCard({
         return;
       }
 
-      const revealVideo =
+      requestAnimationFrame(
         () => {
           requestAnimationFrame(
             () => {
-              requestAnimationFrame(
-                () => {
-                  setVideoReady(
-                    true
-                  );
+              setVideoReady(true);
 
-                  if (
-                    isHoveredRef.current
-                  ) {
-                    videoEl
-                      .play()
-                      .catch(
-                        () => {}
-                      );
-                  }
-                }
-              );
+              if (
+                isHoveredRef.current
+              ) {
+                videoEl
+                  .play()
+                  .catch(
+                    () => {}
+                  );
+              }
             }
           );
-        };
-
-      if (
-        videoEl.readyState >=
-        3
-      ) {
-        revealVideo();
-        return;
-      }
-
-      if (
-        "requestVideoFrameCallback" in
-        videoEl
-      ) {
-        videoEl.requestVideoFrameCallback(
-          () => {
-            revealVideo();
-          }
-        );
-      } else {
-        revealVideo();
-      }
-    }, []);
+        }
+      );
+    },
+    []);
 
   // --------------------------------------------------
   // VIDEO TIME
@@ -1402,9 +1370,6 @@ function WorkCard({
               handleLoadedMetadata
             }
             onLoadedData={
-              handleVideoReady
-            }
-            onCanPlay={
               handleVideoReady
             }
             onTimeUpdate={
@@ -1960,19 +1925,26 @@ export default function AllWorksSection() {
   const listContainerRef =
     useRef(null);
 
-  const bgVideoRef =
-    useRef(null);
+  // --------------------------------------------------
+  // PERSISTENT BACKGROUND VIDEO
+  // --------------------------------------------------
 
-  const noiseRef =
+  const bgVideoRef =
     useRef(null);
 
   const bgHlsRef =
     useRef(null);
 
-  const bgVideoSourceRef =
+  const bgSourceRef =
     useRef(null);
 
-  const bgPlayRetryRef =
+  const bgProjectIdRef =
+    useRef(null);
+
+  const bgPlayRequestedRef =
+    useRef(false);
+
+  const noiseRef =
     useRef(null);
 
   const [viewMode, setViewMode] =
@@ -2007,6 +1979,10 @@ export default function AllWorksSection() {
   const [canHover, setCanHover] =
     useState(false);
 
+  // --------------------------------------------------
+  // HOVER CAPABILITY
+  // --------------------------------------------------
+
   useEffect(() => {
     const mediaQuery =
       window.matchMedia(
@@ -2029,30 +2005,10 @@ export default function AllWorksSection() {
             null
           );
 
-          bgVideoSourceRef.current =
-            null;
-
-          if (
-            bgPlayRetryRef.current
-          ) {
-            clearInterval(
-              bgPlayRetryRef.current
-            );
-
-            bgPlayRetryRef.current =
-              null;
-          }
-
           if (
             bgVideoRef.current
           ) {
             bgVideoRef.current.pause();
-
-            bgVideoRef.current.removeAttribute(
-              "src"
-            );
-
-            bgVideoRef.current.load();
           }
 
           if (
@@ -2061,6 +2017,15 @@ export default function AllWorksSection() {
             bgHlsRef.current.destroy();
             bgHlsRef.current = null;
           }
+
+          bgSourceRef.current =
+            null;
+
+          bgProjectIdRef.current =
+            null;
+
+          bgPlayRequestedRef.current =
+            false;
         }
       };
 
@@ -2078,6 +2043,10 @@ export default function AllWorksSection() {
       );
     };
   }, []);
+
+  // --------------------------------------------------
+  // FETCH PROJECTS
+  // --------------------------------------------------
 
   useEffect(() => {
     let cancelled = false;
@@ -2132,6 +2101,10 @@ export default function AllWorksSection() {
     };
   }, []);
 
+  // --------------------------------------------------
+  // CLIENT FILTERS
+  // --------------------------------------------------
+
   const clientFilters =
     useMemo(() => {
       const clientCounts = {};
@@ -2180,6 +2153,10 @@ export default function AllWorksSection() {
         );
     }, [projects]);
 
+  // --------------------------------------------------
+  // FILTERED PROJECTS
+  // --------------------------------------------------
+
   const filteredProjects =
     useMemo(() => {
       if (
@@ -2203,6 +2180,10 @@ export default function AllWorksSection() {
       selectedClient,
     ]);
 
+  // --------------------------------------------------
+  // ACTIVE PROJECTS
+  // --------------------------------------------------
+
   const activeProjects =
     useMemo(() => {
       return filteredProjects.slice(
@@ -2218,9 +2199,9 @@ export default function AllWorksSection() {
     setVisibleCount(13);
   }, [selectedClient]);
 
-  // ------------------------------------------------------------------
+  // --------------------------------------------------
   // GRID REVEAL
-  // ------------------------------------------------------------------
+  // --------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2269,6 +2250,10 @@ export default function AllWorksSection() {
     selectedClient,
   ]);
 
+  // --------------------------------------------------
+  // VIEW TOGGLE
+  // --------------------------------------------------
+
   const handleToggleView =
     (mode) => {
       if (
@@ -2307,6 +2292,10 @@ export default function AllWorksSection() {
         setViewMode(mode);
       }
     };
+
+  // --------------------------------------------------
+  // CLIENT FILTER
+  // --------------------------------------------------
 
   const handleClientFilter =
     (clientName) => {
@@ -2352,6 +2341,10 @@ export default function AllWorksSection() {
       }
     };
 
+  // --------------------------------------------------
+  // LOAD MORE
+  // --------------------------------------------------
+
   const handleLoadMore =
     () => {
       setVisibleCount(
@@ -2362,6 +2355,10 @@ export default function AllWorksSection() {
           )
       );
     };
+
+  // --------------------------------------------------
+  // REFRESH SCROLLTRIGGER
+  // --------------------------------------------------
 
   useEffect(() => {
     const timer =
@@ -2378,6 +2375,10 @@ export default function AllWorksSection() {
     selectedClient,
   ]);
 
+  // --------------------------------------------------
+  // UPDATE DISPLAY PROJECT
+  // --------------------------------------------------
+
   useEffect(() => {
     if (
       hoveredProject &&
@@ -2392,30 +2393,22 @@ export default function AllWorksSection() {
     canHover,
   ]);
 
-  // --------------------------------------------------
-  // PLAY LIST BACKGROUND VIDEO
-  // --------------------------------------------------
+  // ------------------------------------------------------------------
+  // PERSISTENT LIST BACKGROUND VIDEO
   //
   // IMPORTANT:
   //
-  // The list video should start as soon as possible
-  // and remain playing continuously.
+  // The <video> element itself is NEVER recreated when the hovered
+  // project changes.
   //
-  // We do NOT depend only on MANIFEST_PARSED.
+  // We only replace the HLS source when the actual project changes.
   //
-  // HLS can report the manifest as ready while the
-  // actual media element is still not ready to play.
+  // This prevents:
   //
-  // We therefore retry playback during the short
-  // startup window and also listen for media events.
+  // hover -> destroy video -> create video -> load HLS -> play
   //
-  // We also intentionally do NOT include hoveredProject
-  // in this dependency array.
-  //
-  // displayProject is the actual video being displayed.
-  // Including hoveredProject caused unnecessary
-  // teardown/reinitialisation during hover changes.
-  // --------------------------------------------------
+  // from happening repeatedly.
+  // ------------------------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2425,59 +2418,91 @@ export default function AllWorksSection() {
       return;
     }
 
+    const video =
+      bgVideoRef.current;
+
+    if (!video) {
+      return;
+    }
+
     const source =
       getHeroVideoUrl(
         displayProject
       );
 
-    const video =
-      bgVideoRef.current;
+    const projectId =
+      displayProject?._id ||
+      null;
 
-    if (
-      !source ||
-      !video
-    ) {
+    // --------------------------------------------------
+    // NOTHING TO PLAY
+    // --------------------------------------------------
+
+    if (!source) {
+      bgPlayRequestedRef.current =
+        false;
+
+      if (
+        bgHlsRef.current
+      ) {
+        bgHlsRef.current.destroy();
+        bgHlsRef.current = null;
+      }
+
+      bgSourceRef.current =
+        null;
+
+      bgProjectIdRef.current =
+        null;
+
       return;
     }
 
     // --------------------------------------------------
-    // DO NOT REINITIALISE THE SAME VIDEO
+    // SAME PROJECT
+    //
+    // Do NOT rebuild the HLS player.
     // --------------------------------------------------
 
     if (
-      bgVideoSourceRef.current ===
-      source
+      bgSourceRef.current ===
+        source &&
+      bgProjectIdRef.current ===
+        projectId
     ) {
+      bgPlayRequestedRef.current =
+        true;
+
+      video
+        .play()
+        .catch(() => {});
+
       return;
     }
 
-    bgVideoSourceRef.current =
+    // --------------------------------------------------
+    // NEW PROJECT
+    // --------------------------------------------------
+
+    bgSourceRef.current =
       source;
 
-    // --------------------------------------------------
-    // CLEAR PREVIOUS RETRIES
-    // --------------------------------------------------
+    bgProjectIdRef.current =
+      projectId;
 
+    bgPlayRequestedRef.current =
+      true;
+
+    // Kill ONLY the old HLS source.
+    // The actual <video> DOM element remains alive.
     if (
-      bgPlayRetryRef.current
+      bgHlsRef.current
     ) {
-      clearInterval(
-        bgPlayRetryRef.current
-      );
-
-      bgPlayRetryRef.current =
-        null;
-    }
-
-    // --------------------------------------------------
-    // CLEAN UP PREVIOUS HLS INSTANCE
-    // --------------------------------------------------
-
-    if (bgHlsRef.current) {
       bgHlsRef.current.destroy();
       bgHlsRef.current = null;
     }
 
+    // Reset the media element without replacing it.
     video.pause();
 
     video.removeAttribute(
@@ -2485,32 +2510,6 @@ export default function AllWorksSection() {
     );
 
     video.load();
-
-    // --------------------------------------------------
-    // PLAY HELPER
-    // --------------------------------------------------
-
-    const tryPlay =
-      () => {
-        if (
-          !video ||
-          video.paused === false
-        ) {
-          return;
-        }
-
-        const playPromise =
-          video.play();
-
-        if (
-          playPromise !==
-          undefined
-        ) {
-          playPromise.catch(
-            () => {}
-          );
-        }
-      };
 
     // --------------------------------------------------
     // SAFARI / NATIVE HLS
@@ -2524,105 +2523,46 @@ export default function AllWorksSection() {
       video.src = source;
       video.load();
 
-      video.addEventListener(
-        "loadedmetadata",
-        tryPlay
-      );
+      const attemptPlay =
+        () => {
+          if (
+            !bgPlayRequestedRef.current
+          ) {
+            return;
+          }
+
+          video
+            .play()
+            .catch(() => {});
+        };
 
       video.addEventListener(
         "loadeddata",
-        tryPlay
+        attemptPlay
       );
 
       video.addEventListener(
         "canplay",
-        tryPlay
+        attemptPlay
       );
 
-      video.addEventListener(
-        "canplaythrough",
-        tryPlay
-      );
-
-      video.addEventListener(
-        "playing",
-        () => {
-          if (
-            bgPlayRetryRef.current
-          ) {
-            clearInterval(
-              bgPlayRetryRef.current
-            );
-
-            bgPlayRetryRef.current =
-              null;
-          }
-        }
-      );
-
-      tryPlay();
-
-      bgPlayRetryRef.current =
-        setInterval(() => {
-          if (
-            video.paused
-          ) {
-            tryPlay();
-          } else {
-            clearInterval(
-              bgPlayRetryRef.current
-            );
-
-            bgPlayRetryRef.current =
-              null;
-          }
-        }, 250);
+      attemptPlay();
 
       return () => {
-        if (
-          bgPlayRetryRef.current
-        ) {
-          clearInterval(
-            bgPlayRetryRef.current
-          );
-
-          bgPlayRetryRef.current =
-            null;
-        }
-
-        video.removeEventListener(
-          "loadedmetadata",
-          tryPlay
-        );
-
         video.removeEventListener(
           "loadeddata",
-          tryPlay
+          attemptPlay
         );
 
         video.removeEventListener(
           "canplay",
-          tryPlay
+          attemptPlay
         );
-
-        video.removeEventListener(
-          "canplaythrough",
-          tryPlay
-        );
-
-        video.pause();
-        video.removeAttribute(
-          "src"
-        );
-        video.load();
-
-        bgVideoSourceRef.current =
-          null;
       };
     }
 
     // --------------------------------------------------
-    // CHROME / EDGE / FIREFOX
+    // HLS.JS
     // --------------------------------------------------
 
     if (
@@ -2630,108 +2570,115 @@ export default function AllWorksSection() {
     ) {
       const hls =
         new Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          backBufferLength: 30,
-          capLevelToPlayerSize: true,
-          maxBufferLength: 8,
-          maxMaxBufferLength: 20,
+          enableWorker:
+            true,
+
+          lowLatencyMode:
+            false,
+
+          backBufferLength:
+            30,
+
+          capLevelToPlayerSize:
+            true,
+
+          maxBufferLength:
+            20,
+
+          maxMaxBufferLength:
+            40,
+
           startLevel: -1,
+
+          // Start loading media immediately.
+          autoStartLoad: true,
+
+          // Avoid unnecessary quality jumps while
+          // the background player is starting.
+          abrEwmaFastLive: 3,
+          abrEwmaSlowLive: 9,
         });
 
       bgHlsRef.current =
         hls;
 
-      // ----------------------------------------------
-      // MEDIA EVENTS
-      // ----------------------------------------------
-
-      video.addEventListener(
-        "loadedmetadata",
-        tryPlay
-      );
-
-      video.addEventListener(
-        "loadeddata",
-        tryPlay
-      );
-
-      video.addEventListener(
-        "canplay",
-        tryPlay
-      );
-
-      video.addEventListener(
-        "canplaythrough",
-        tryPlay
-      );
-
-      video.addEventListener(
-        "playing",
+      const attemptPlay =
         () => {
           if (
-            bgPlayRetryRef.current
+            !bgPlayRequestedRef.current
           ) {
-            clearInterval(
-              bgPlayRetryRef.current
-            );
-
-            bgPlayRetryRef.current =
-              null;
+            return;
           }
-        }
-      );
 
-      // ----------------------------------------------
-      // HLS MANIFEST
-      // ----------------------------------------------
+          if (
+            video.readyState >= 2
+          ) {
+            video
+              .play()
+              .catch(() => {});
+          }
+        };
 
+      // Manifest exists — immediately attempt playback.
       hls.on(
         Hls.Events.MANIFEST_PARSED,
         () => {
-          tryPlay();
+          attemptPlay();
         }
       );
 
-      // ----------------------------------------------
-      // HLS FRAGMENTS
-      // ----------------------------------------------
-
+      // First media fragment is actually buffered.
+      // This is the important part for avoiding
+      // play -> pause -> play behaviour.
       hls.on(
-        Hls.Events.FRAG_LOADED,
+        Hls.Events.FRAG_BUFFERED,
         () => {
-          tryPlay();
+          attemptPlay();
         }
       );
 
+      // If playback stalls while the background is visible,
+      // resume it once enough data is available.
       hls.on(
         Hls.Events.BUFFER_APPENDED,
         () => {
-          tryPlay();
+          if (
+            video.paused &&
+            bgPlayRequestedRef.current
+          ) {
+            attemptPlay();
+          }
         }
       );
-
-      // ----------------------------------------------
-      // RECOVERABLE HLS ERRORS
-      // ----------------------------------------------
 
       hls.on(
         Hls.Events.ERROR,
         (_, data) => {
           if (
-            data?.fatal
+            !data?.fatal
           ) {
-            console.warn(
-              "List HLS fatal error:",
-              data
-            );
+            return;
+          }
+
+          // Recover from the common media/network errors
+          // instead of immediately giving up.
+          if (
+            data.type ===
+            Hls.ErrorTypes.NETWORK_ERROR
+          ) {
+            hls.startLoad();
+            return;
+          }
+
+          if (
+            data.type ===
+            Hls.ErrorTypes.MEDIA_ERROR
+          ) {
+            hls.recoverMediaError();
+            return;
           }
         }
       );
-
-      // ----------------------------------------------
-      // ATTACH SOURCE
-      // ----------------------------------------------
 
       hls.loadSource(
         source
@@ -2741,72 +2688,185 @@ export default function AllWorksSection() {
         video
       );
 
-      // ----------------------------------------------
-      // IMMEDIATE PLAY ATTEMPT
-      // ----------------------------------------------
-
-      tryPlay();
-
-      // ----------------------------------------------
-      // SHORT STARTUP RETRY WINDOW
-      // ----------------------------------------------
-      //
-      // This prevents the "plays then stops" feeling
-      // while Bunny/HLS is moving from manifest ->
-      // first playable segment.
-      //
-      // Once the video is genuinely playing,
-      // the interval disappears.
-      // ----------------------------------------------
-
-      bgPlayRetryRef.current =
-        setInterval(() => {
-          if (
-            video.paused
-          ) {
-            tryPlay();
-          } else {
-            clearInterval(
-              bgPlayRetryRef.current
-            );
-
-            bgPlayRetryRef.current =
-              null;
-          }
-        }, 250);
+      return () => {
+        // Only clean up this HLS instance if it is still
+        // the active background player.
+        if (
+          bgHlsRef.current ===
+          hls
+        ) {
+          hls.destroy();
+          bgHlsRef.current =
+            null;
+        }
+      };
     }
 
-    return () => {
-      if (
-        bgPlayRetryRef.current
-      ) {
-        clearInterval(
-          bgPlayRetryRef.current
+    return undefined;
+  }, [
+    displayProject,
+    viewMode,
+    canHover,
+  ]);
+
+  // ------------------------------------------------------------------
+  // BACKGROUND VIDEO STALL RECOVERY
+  // ------------------------------------------------------------------
+  //
+  // This listener stays attached to the persistent <video>.
+  // It does not recreate the player.
+  // ------------------------------------------------------------------
+
+  useEffect(() => {
+    const video =
+      bgVideoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    const handleWaiting =
+      () => {
+        if (
+          viewMode !== "list" ||
+          !canHover ||
+          !hoveredProject
+        ) {
+          return;
+        }
+
+        const retry =
+          () => {
+            if (
+              !video.paused &&
+              video.readyState >=
+                3
+            ) {
+              return;
+            }
+
+            if (
+              bgPlayRequestedRef.current
+            ) {
+              video
+                .play()
+                .catch(() => {});
+            }
+          };
+
+        setTimeout(
+          retry,
+          80
         );
+      };
 
-        bgPlayRetryRef.current =
-          null;
-      }
+    const handleStalled =
+      () => {
+        if (
+          viewMode !== "list" ||
+          !canHover ||
+          !hoveredProject
+        ) {
+          return;
+        }
 
+        if (
+          bgPlayRequestedRef.current
+        ) {
+          setTimeout(
+            () => {
+              video
+                .play()
+                .catch(() => {});
+            },
+            100
+          );
+        }
+      };
+
+    video.addEventListener(
+      "waiting",
+      handleWaiting
+    );
+
+    video.addEventListener(
+      "stalled",
+      handleStalled
+    );
+
+    return () => {
       video.removeEventListener(
-        "loadedmetadata",
-        tryPlay
+        "waiting",
+        handleWaiting
       );
 
       video.removeEventListener(
-        "loadeddata",
-        tryPlay
+        "stalled",
+        handleStalled
+      );
+    };
+  }, [
+    viewMode,
+    canHover,
+    hoveredProject,
+  ]);
+
+  // ------------------------------------------------------------------
+  // LENIS
+  // ------------------------------------------------------------------
+
+  useEffect(() => {
+    const lenis =
+      new Lenis({
+        duration: 1.2,
+
+        easing: (t) =>
+          Math.min(
+            1,
+            1.001 -
+              Math.pow(
+                2,
+                -10 * t
+              )
+          ),
+
+        smoothWheel: true,
+        touchMultiplier: 2,
+      });
+
+    let frameId;
+
+    function raf(time) {
+      lenis.raf(time);
+
+      frameId =
+        requestAnimationFrame(
+          raf
+        );
+    }
+
+    frameId =
+      requestAnimationFrame(
+        raf
       );
 
-      video.removeEventListener(
-        "canplay",
-        tryPlay
+    return () => {
+      cancelAnimationFrame(
+        frameId
       );
 
-      video.removeEventListener(
-        "canplaythrough",
-        tryPlay
-      );
+      lenis.destroy();
+    };
+  }, []);
+
+  // ------------------------------------------------------------------
+  // CLEAN UP BACKGROUND PLAYER ON UNMOUNT
+  // ------------------------------------------------------------------
+
+  useEffect(() => {
+    return () => {
+      bgPlayRequestedRef.current =
+        false;
 
       if (
         bgHlsRef.current
@@ -2815,26 +2875,29 @@ export default function AllWorksSection() {
         bgHlsRef.current = null;
       }
 
-      video.pause();
+      if (
+        bgVideoRef.current
+      ) {
+        bgVideoRef.current.pause();
 
-      video.removeAttribute(
-        "src"
-      );
+        bgVideoRef.current.removeAttribute(
+          "src"
+        );
 
-      video.load();
+        bgVideoRef.current.load();
+      }
 
-      bgVideoSourceRef.current =
+      bgSourceRef.current =
+        null;
+
+      bgProjectIdRef.current =
         null;
     };
-  }, [
-    displayProject,
-    viewMode,
-    canHover,
-  ]);
+  }, []);
 
-  // --------------------------------------------------
+  // ------------------------------------------------------------------
   // LIST REVEAL
-  // --------------------------------------------------
+  // ------------------------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2891,50 +2954,6 @@ export default function AllWorksSection() {
     selectedClient,
   ]);
 
-  useEffect(() => {
-    const lenis =
-      new Lenis({
-        duration: 1.2,
-
-        easing: (t) =>
-          Math.min(
-            1,
-            1.001 -
-              Math.pow(
-                2,
-                -10 * t
-              )
-          ),
-
-        smoothWheel: true,
-        touchMultiplier: 2,
-      });
-
-    let frameId;
-
-    function raf(time) {
-      lenis.raf(time);
-
-      frameId =
-        requestAnimationFrame(
-          raf
-        );
-    }
-
-    frameId =
-      requestAnimationFrame(
-        raf
-      );
-
-    return () => {
-      cancelAnimationFrame(
-        frameId
-      );
-
-      lenis.destroy();
-    };
-  }, []);
-
   if (isLoading) {
     return (
       <div className="bg-black w-full min-h-screen flex items-center justify-center">
@@ -2949,7 +2968,15 @@ export default function AllWorksSection() {
         ref={noiseRef}
       />
 
-      {/* BACKGROUND VIDEO */}
+      {/* --------------------------------------------------------------
+          PERSISTENT BACKGROUND VIDEO
+
+          IMPORTANT:
+          There is only ONE video element.
+
+          It does NOT have a React key tied to the project.
+          The HLS source changes inside the same element.
+         -------------------------------------------------------------- */}
 
       {canHover && (
         <div
@@ -2970,40 +2997,21 @@ export default function AllWorksSection() {
             }
           `}
         >
-          {displayProject && (
-            <>
-              {(() => {
-                const source =
-                  getHeroVideoUrl(
-                    displayProject
-                  );
-
-                return source ? (
-                  <video
-                    key={
-                      displayProject._id
-                    }
-                    ref={
-                      bgVideoRef
-                    }
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    fetchPriority="high"
-                    className="
-                      absolute
-                      inset-0
-                      w-full
-                      h-full
-                      object-cover
-                    "
-                  />
-                ) : null;
-              })()}
-            </>
-          )}
+          <video
+            ref={bgVideoRef}
+            muted
+            loop
+            playsInline
+            autoPlay
+            preload="auto"
+            className="
+              absolute
+              inset-0
+              w-full
+              h-full
+              object-cover
+            "
+          />
 
           <div className="absolute inset-0 bg-black/60" />
         </div>
@@ -3129,8 +3137,7 @@ export default function AllWorksSection() {
                     .slice(0, 3)
                     .map(
                       (
-                        project,
-                        index
+                        project
                       ) => (
                         <WorkCard
                           key={
