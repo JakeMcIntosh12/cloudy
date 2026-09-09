@@ -200,10 +200,16 @@ function RadialVaporRing() {
 
     if (!container) return;
 
-    const actualScrollY =
+    const lenisInstance =
       typeof window !== "undefined"
-        ? window.scrollY
-        : 0;
+        ? window.__lenis
+        : null;
+
+    const actualScrollY = lenisInstance
+      ? lenisInstance.scroll
+      : typeof window !== "undefined"
+      ? window.scrollY
+      : 0;
 
     /* =======================================================
        TARGET SCROLL
