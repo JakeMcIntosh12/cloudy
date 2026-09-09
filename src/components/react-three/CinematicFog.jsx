@@ -1,8 +1,8 @@
-
 "use client";
 
 import React, {
   useRef,
+  useState,
   useSyncExternalStore,
   Suspense,
   useEffect,
@@ -68,7 +68,7 @@ const scrollState = {
    WEBGL CONTEXT GUARD
 ========================================================= */
 
-function WebGLContextGuard() {
+function WebGLContextGuard({ onLost, onRestored }) {
   const { gl } = useThree();
 
   useEffect(() => {
@@ -78,11 +78,22 @@ function WebGLContextGuard() {
 
     const handleContextLost = (event) => {
       event.preventDefault();
+      onLost?.();
+    };
+
+    const handleContextRestored = () => {
+      onRestored?.();
     };
 
     canvas.addEventListener(
       "webglcontextlost",
       handleContextLost,
+      false
+    );
+
+    canvas.addEventListener(
+      "webglcontextrestored",
+      handleContextRestored,
       false
     );
 
@@ -92,8 +103,14 @@ function WebGLContextGuard() {
         handleContextLost,
         false
       );
+
+      canvas.removeEventListener(
+        "webglcontextrestored",
+        handleContextRestored,
+        false
+      );
     };
-  }, [gl]);
+  }, [gl, onLost, onRestored]);
 
   return null;
 }
@@ -114,10 +131,18 @@ function RadialVaporRing() {
       if (typeof document !== "undefined") {
         const docElement = document.documentElement;
 
+        const viewportHeight =
+          (typeof window !== "undefined" &&
+            window.visualViewport &&
+            window.visualViewport.height) ||
+          (typeof window !== "undefined"
+            ? window.innerHeight
+            : 0);
+
         docHeightRef.current = docElement
           ? Math.max(
               1,
-              docElement.scrollHeight - window.innerHeight
+              docElement.scrollHeight - viewportHeight
             )
           : 1;
       }
@@ -125,11 +150,24 @@ function RadialVaporRing() {
 
     updateDocHeight();
 
-    window.addEventListener(
-      "resize",
-      updateDocHeight,
-      { passive: true }
-    );
+    const vv =
+      typeof window !== "undefined"
+        ? window.visualViewport
+        : null;
+
+    if (vv) {
+      vv.addEventListener(
+        "resize",
+        updateDocHeight,
+        { passive: true }
+      );
+    } else {
+      window.addEventListener(
+        "resize",
+        updateDocHeight,
+        { passive: true }
+      );
+    }
 
     window.addEventListener(
       "orientationchange",
@@ -138,10 +176,17 @@ function RadialVaporRing() {
     );
 
     return () => {
-      window.removeEventListener(
-        "resize",
-        updateDocHeight
-      );
+      if (vv) {
+        vv.removeEventListener(
+          "resize",
+          updateDocHeight
+        );
+      } else {
+        window.removeEventListener(
+          "resize",
+          updateDocHeight
+        );
+      }
 
       window.removeEventListener(
         "orientationchange",
@@ -378,6 +423,7 @@ function RadialVaporRing() {
 
 export default function GlobalCinematicFog() {
   const isClient = useIsClient();
+  const [canvasKey, setCanvasKey] = useState(0);
 
   if (!isClient) return null;
 
@@ -398,7 +444,7 @@ export default function GlobalCinematicFog() {
         touchAction: "none",
       }}
     >
-      <WebGLSceneErrorBoundary>
+      <WebGLSceneErrorBoundary key={canvasKey}>
         <Canvas
           dpr={[1, 1.5]}
           camera={{
@@ -425,7 +471,11 @@ export default function GlobalCinematicFog() {
             );
           }}
         >
-          <WebGLContextGuard />
+          <WebGLContextGuard
+            onRestored={() =>
+              setCanvasKey((k) => k + 1)
+            }
+          />
 
           <ambientLight intensity={1.2} />
 
@@ -442,4 +492,3 @@ export default function GlobalCinematicFog() {
     </div>
   );
 }
-
