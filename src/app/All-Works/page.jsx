@@ -95,20 +95,6 @@ function getHeroVideoUrl(project) {
 // ----------------------------------------------------------------------
 // BUNNY POSTER URL
 // ----------------------------------------------------------------------
-//
-// Bunny Stream convention:
-//
-// playlist.m3u8
-// thumbnail.jpg
-//
-// Both live inside the same video directory.
-//
-// Example:
-// https://vz-XXXXXXXX.b-cdn.net/video-id/playlist.m3u8
-//
-// becomes:
-// https://vz-XXXXXXXX.b-cdn.net/video-id/thumbnail.jpg
-// ----------------------------------------------------------------------
 
 function getBunnyPosterUrl(hlsUrl) {
   if (
@@ -127,8 +113,6 @@ function getBunnyPosterUrl(hlsUrl) {
     );
   }
 
-  // Fallback for Bunny setups using
-  // another manifest filename.
   const lastSlash =
     hlsUrl.lastIndexOf("/");
 
@@ -144,16 +128,6 @@ function getBunnyPosterUrl(hlsUrl) {
 
 // ----------------------------------------------------------------------
 // HLS CONCURRENCY QUEUE
-// ----------------------------------------------------------------------
-//
-// Prevents all 13 cards from simultaneously hammering
-// Bunny with HLS requests.
-//
-// Normal cards:
-// max 4 HLS loads at once.
-//
-// Priority cards:
-// first 3 cards can start immediately.
 // ----------------------------------------------------------------------
 
 const MAX_CONCURRENT_HLS = 4;
@@ -275,10 +249,6 @@ function useHlsVideo(
                   backBufferLength:
                     30,
 
-                  // Important:
-                  // allow hls.js to avoid
-                  // unnecessarily downloading
-                  // oversized quality levels.
                   capLevelToPlayerSize:
                     true,
 
@@ -930,9 +900,6 @@ function WorkCard({
   const [hasVideoError, setHasVideoError] =
     useState(false);
 
-  // NEW:
-  // Keeps the Bunny poster visible until
-  // the actual HLS video can play.
   const [videoReady, setVideoReady] =
     useState(false);
 
@@ -944,6 +911,9 @@ function WorkCard({
 
   const videoRef =
     useRef(null);
+
+  const isHoveredRef =
+    useRef(false);
 
   const isMobile =
     useIsMobileViewport();
@@ -1070,6 +1040,66 @@ function WorkCard({
     };
 
   // --------------------------------------------------
+  // VIDEO READY
+  // --------------------------------------------------
+
+  const handleVideoReady =
+    useCallback(() => {
+      const videoEl =
+        videoRef.current;
+
+      if (!videoEl) {
+        return;
+      }
+
+      const revealVideo =
+        () => {
+          requestAnimationFrame(
+            () => {
+              requestAnimationFrame(
+                () => {
+                  setVideoReady(
+                    true
+                  );
+
+                  if (
+                    isHoveredRef.current
+                  ) {
+                    videoEl
+                      .play()
+                      .catch(
+                        () => {}
+                      );
+                  }
+                }
+              );
+            }
+          );
+        };
+
+      if (
+        videoEl.readyState >=
+        3
+      ) {
+        revealVideo();
+        return;
+      }
+
+      if (
+        "requestVideoFrameCallback" in
+        videoEl
+      ) {
+        videoEl.requestVideoFrameCallback(
+          () => {
+            revealVideo();
+          }
+        );
+      } else {
+        revealVideo();
+      }
+    }, []);
+
+  // --------------------------------------------------
   // VIDEO TIME
   // --------------------------------------------------
 
@@ -1093,6 +1123,9 @@ function WorkCard({
 
   const handleMouseEnter =
     async () => {
+      isHoveredRef.current =
+        true;
+
       let source =
         videoUrl;
 
@@ -1145,6 +1178,9 @@ function WorkCard({
 
   const handleMouseLeave =
     () => {
+      isHoveredRef.current =
+        false;
+
       onHoverChange(
         false,
         containerRef.current,
@@ -1232,13 +1268,6 @@ function WorkCard({
   // --------------------------------------------------
   // LOAD ALL VIDEOS IMMEDIATELY
   // --------------------------------------------------
-  //
-  // This still happens immediately.
-  //
-  // The difference is that useHlsVideo now controls
-  // how many HLS streams are actually initialised
-  // simultaneously.
-  // --------------------------------------------------
 
   useEffect(() => {
     if (!rawUrl) {
@@ -1314,29 +1343,19 @@ function WorkCard({
           ${heightClassName || ""}
         `}
       >
-        {/* --------------------------------------------------
-            BUNNY POSTER
-            --------------------------------------------------
-
-            This is a normal image request.
-
-            It does NOT wait for hls.js.
-
-            It stays visible while the HLS stream
-            initialises and disappears once the
-            video fires canplay.
-        -------------------------------------------------- */}
+        {/* BUNNY POSTER */}
 
         {posterUrl && (
           <img
             src={posterUrl}
             alt=""
-            loading={
-              priority
-                ? "eager"
-                : "lazy"
-            }
+            loading="eager"
             decoding="async"
+            fetchPriority={
+              priority
+                ? "high"
+                : "auto"
+            }
             className={`
               absolute
               inset-0
@@ -1346,7 +1365,8 @@ function WorkCard({
               brightness-90
               contrast-105
               transition-opacity
-              duration-300
+              duration-700
+              ease-out
               pointer-events-none
               ${
                 videoReady
@@ -1357,9 +1377,7 @@ function WorkCard({
           />
         )}
 
-        {/* --------------------------------------------------
-            HLS VIDEO
-        -------------------------------------------------- */}
+        {/* HLS VIDEO */}
 
         {videoUrl ? (
           <video
@@ -1383,11 +1401,14 @@ function WorkCard({
             onLoadedMetadata={
               handleLoadedMetadata
             }
+            onLoadedData={
+              handleVideoReady
+            }
+            onCanPlay={
+              handleVideoReady
+            }
             onTimeUpdate={
               handleTimeUpdate
-            }
-            onCanPlay={() =>
-              setVideoReady(true)
             }
             className={`
               absolute
@@ -1398,7 +1419,8 @@ function WorkCard({
               brightness-90
               contrast-105
               transition-opacity
-              duration-300
+              duration-700
+              ease-out
               ${
                 videoReady
                   ? "opacity-100"
@@ -1947,6 +1969,12 @@ export default function AllWorksSection() {
   const bgHlsRef =
     useRef(null);
 
+  const bgVideoSourceRef =
+    useRef(null);
+
+  const bgPlayRetryRef =
+    useRef(null);
+
   const [viewMode, setViewMode] =
     useState("grid");
 
@@ -2000,6 +2028,20 @@ export default function AllWorksSection() {
           setDisplayProject(
             null
           );
+
+          bgVideoSourceRef.current =
+            null;
+
+          if (
+            bgPlayRetryRef.current
+          ) {
+            clearInterval(
+              bgPlayRetryRef.current
+            );
+
+            bgPlayRetryRef.current =
+              null;
+          }
 
           if (
             bgVideoRef.current
@@ -2178,11 +2220,6 @@ export default function AllWorksSection() {
 
   // ------------------------------------------------------------------
   // GRID REVEAL
-  //
-  // IMPORTANT:
-  // viewMode is intentionally NOT a dependency here.
-  // This prevents switching LIST -> GRID from resetting every
-  // WorkCard's animation state.
   // ------------------------------------------------------------------
 
   useEffect(() => {
@@ -2356,7 +2393,28 @@ export default function AllWorksSection() {
   ]);
 
   // --------------------------------------------------
-  // PLAY BACKGROUND VIDEO
+  // PLAY LIST BACKGROUND VIDEO
+  // --------------------------------------------------
+  //
+  // IMPORTANT:
+  //
+  // The list video should start as soon as possible
+  // and remain playing continuously.
+  //
+  // We do NOT depend only on MANIFEST_PARSED.
+  //
+  // HLS can report the manifest as ready while the
+  // actual media element is still not ready to play.
+  //
+  // We therefore retry playback during the short
+  // startup window and also listen for media events.
+  //
+  // We also intentionally do NOT include hoveredProject
+  // in this dependency array.
+  //
+  // displayProject is the actual video being displayed.
+  // Including hoveredProject caused unnecessary
+  // teardown/reinitialisation during hover changes.
   // --------------------------------------------------
 
   useEffect(() => {
@@ -2382,18 +2440,82 @@ export default function AllWorksSection() {
       return;
     }
 
+    // --------------------------------------------------
+    // DO NOT REINITIALISE THE SAME VIDEO
+    // --------------------------------------------------
+
+    if (
+      bgVideoSourceRef.current ===
+      source
+    ) {
+      return;
+    }
+
+    bgVideoSourceRef.current =
+      source;
+
+    // --------------------------------------------------
+    // CLEAR PREVIOUS RETRIES
+    // --------------------------------------------------
+
+    if (
+      bgPlayRetryRef.current
+    ) {
+      clearInterval(
+        bgPlayRetryRef.current
+      );
+
+      bgPlayRetryRef.current =
+        null;
+    }
+
+    // --------------------------------------------------
+    // CLEAN UP PREVIOUS HLS INSTANCE
+    // --------------------------------------------------
+
     if (bgHlsRef.current) {
       bgHlsRef.current.destroy();
       bgHlsRef.current = null;
     }
 
     video.pause();
+
     video.removeAttribute(
       "src"
     );
+
     video.load();
 
-    // Safari / native HLS
+    // --------------------------------------------------
+    // PLAY HELPER
+    // --------------------------------------------------
+
+    const tryPlay =
+      () => {
+        if (
+          !video ||
+          video.paused === false
+        ) {
+          return;
+        }
+
+        const playPromise =
+          video.play();
+
+        if (
+          playPromise !==
+          undefined
+        ) {
+          playPromise.catch(
+            () => {}
+          );
+        }
+      };
+
+    // --------------------------------------------------
+    // SAFARI / NATIVE HLS
+    // --------------------------------------------------
+
     if (
       video.canPlayType(
         "application/vnd.apple.mpegurl"
@@ -2402,22 +2524,107 @@ export default function AllWorksSection() {
       video.src = source;
       video.load();
 
-      const playPromise =
-        video.play();
+      video.addEventListener(
+        "loadedmetadata",
+        tryPlay
+      );
 
-      if (
-        playPromise !==
-        undefined
-      ) {
-        playPromise.catch(
-          () => {}
+      video.addEventListener(
+        "loadeddata",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "canplay",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "canplaythrough",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "playing",
+        () => {
+          if (
+            bgPlayRetryRef.current
+          ) {
+            clearInterval(
+              bgPlayRetryRef.current
+            );
+
+            bgPlayRetryRef.current =
+              null;
+          }
+        }
+      );
+
+      tryPlay();
+
+      bgPlayRetryRef.current =
+        setInterval(() => {
+          if (
+            video.paused
+          ) {
+            tryPlay();
+          } else {
+            clearInterval(
+              bgPlayRetryRef.current
+            );
+
+            bgPlayRetryRef.current =
+              null;
+          }
+        }, 250);
+
+      return () => {
+        if (
+          bgPlayRetryRef.current
+        ) {
+          clearInterval(
+            bgPlayRetryRef.current
+          );
+
+          bgPlayRetryRef.current =
+            null;
+        }
+
+        video.removeEventListener(
+          "loadedmetadata",
+          tryPlay
         );
-      }
 
-      return;
+        video.removeEventListener(
+          "loadeddata",
+          tryPlay
+        );
+
+        video.removeEventListener(
+          "canplay",
+          tryPlay
+        );
+
+        video.removeEventListener(
+          "canplaythrough",
+          tryPlay
+        );
+
+        video.pause();
+        video.removeAttribute(
+          "src"
+        );
+        video.load();
+
+        bgVideoSourceRef.current =
+          null;
+      };
     }
 
-    // Chrome / Edge / Firefox
+    // --------------------------------------------------
+    // CHROME / EDGE / FIREFOX
+    // --------------------------------------------------
+
     if (
       Hls.isSupported()
     ) {
@@ -2435,28 +2642,172 @@ export default function AllWorksSection() {
       bgHlsRef.current =
         hls;
 
-      hls.loadSource(source);
-      hls.attachMedia(video);
+      // ----------------------------------------------
+      // MEDIA EVENTS
+      // ----------------------------------------------
+
+      video.addEventListener(
+        "loadedmetadata",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "loadeddata",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "canplay",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "canplaythrough",
+        tryPlay
+      );
+
+      video.addEventListener(
+        "playing",
+        () => {
+          if (
+            bgPlayRetryRef.current
+          ) {
+            clearInterval(
+              bgPlayRetryRef.current
+            );
+
+            bgPlayRetryRef.current =
+              null;
+          }
+        }
+      );
+
+      // ----------------------------------------------
+      // HLS MANIFEST
+      // ----------------------------------------------
 
       hls.on(
         Hls.Events.MANIFEST_PARSED,
         () => {
-          const playPromise =
-            video.play();
+          tryPlay();
+        }
+      );
 
+      // ----------------------------------------------
+      // HLS FRAGMENTS
+      // ----------------------------------------------
+
+      hls.on(
+        Hls.Events.FRAG_LOADED,
+        () => {
+          tryPlay();
+        }
+      );
+
+      hls.on(
+        Hls.Events.BUFFER_APPENDED,
+        () => {
+          tryPlay();
+        }
+      );
+
+      // ----------------------------------------------
+      // RECOVERABLE HLS ERRORS
+      // ----------------------------------------------
+
+      hls.on(
+        Hls.Events.ERROR,
+        (_, data) => {
           if (
-            playPromise !==
-            undefined
+            data?.fatal
           ) {
-            playPromise.catch(
-              () => {}
+            console.warn(
+              "List HLS fatal error:",
+              data
             );
           }
         }
       );
+
+      // ----------------------------------------------
+      // ATTACH SOURCE
+      // ----------------------------------------------
+
+      hls.loadSource(
+        source
+      );
+
+      hls.attachMedia(
+        video
+      );
+
+      // ----------------------------------------------
+      // IMMEDIATE PLAY ATTEMPT
+      // ----------------------------------------------
+
+      tryPlay();
+
+      // ----------------------------------------------
+      // SHORT STARTUP RETRY WINDOW
+      // ----------------------------------------------
+      //
+      // This prevents the "plays then stops" feeling
+      // while Bunny/HLS is moving from manifest ->
+      // first playable segment.
+      //
+      // Once the video is genuinely playing,
+      // the interval disappears.
+      // ----------------------------------------------
+
+      bgPlayRetryRef.current =
+        setInterval(() => {
+          if (
+            video.paused
+          ) {
+            tryPlay();
+          } else {
+            clearInterval(
+              bgPlayRetryRef.current
+            );
+
+            bgPlayRetryRef.current =
+              null;
+          }
+        }, 250);
     }
 
     return () => {
+      if (
+        bgPlayRetryRef.current
+      ) {
+        clearInterval(
+          bgPlayRetryRef.current
+        );
+
+        bgPlayRetryRef.current =
+          null;
+      }
+
+      video.removeEventListener(
+        "loadedmetadata",
+        tryPlay
+      );
+
+      video.removeEventListener(
+        "loadeddata",
+        tryPlay
+      );
+
+      video.removeEventListener(
+        "canplay",
+        tryPlay
+      );
+
+      video.removeEventListener(
+        "canplaythrough",
+        tryPlay
+      );
+
       if (
         bgHlsRef.current
       ) {
@@ -2465,17 +2816,25 @@ export default function AllWorksSection() {
       }
 
       video.pause();
+
       video.removeAttribute(
         "src"
       );
+
       video.load();
+
+      bgVideoSourceRef.current =
+        null;
     };
   }, [
     displayProject,
-    hoveredProject,
     viewMode,
     canHover,
   ]);
+
+  // --------------------------------------------------
+  // LIST REVEAL
+  // --------------------------------------------------
 
   useEffect(() => {
     if (
@@ -2753,11 +3112,6 @@ export default function AllWorksSection() {
         >
           {/* ==========================================================
               GRID VIEW
-
-              IMPORTANT:
-              This remains mounted even when LIST is selected.
-              It is only hidden with CSS, so WorkCard video/HLS
-              instances are preserved.
              ========================================================== */}
 
           <div
@@ -3184,8 +3538,6 @@ export default function AllWorksSection() {
 
           {/* ==========================================================
               LIST VIEW
-
-              Also remains mounted. Only visibility changes.
              ========================================================== */}
 
           <div
