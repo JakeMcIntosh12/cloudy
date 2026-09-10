@@ -1,35 +1,43 @@
 import React from 'react'
 
 export const metadata = {
-  title: 'About Cloudhaus',
+  title: {
+    absolute: "About Cloudhaus | Adelaide Visual Studio",
+  },
+
   description:
-    'Cloudhaus is a visual studio creating cinematic films and photography for high-end architecture and construction.',
-    openGraph: {
-    title: 'About Cloudhaus',
+    "Meet Cloudhaus, an Adelaide visual studio creating cinematic films and high-end photography for architecture, construction and design.",
+
+  alternates: {
+    canonical: "/About",
+  },
+
+  openGraph: {
+    title: "About Cloudhaus | Adelaide Visual Studio",
     description:
-      'Cloudhaus is a visual studio creating cinematic films and photography for high-end architecture and construction.',
-    url: 'https://cloudhausmedia.com/About',
-    siteName: 'Cloudhaus',
+      "Meet Cloudhaus, an Adelaide visual studio creating cinematic films and high-end photography for architecture, construction and design.",
+    url: "/About",
+    siteName: "Cloudhaus",
     images: [
       {
-        url: 'https://cloudhausmedia.com/Assets/Logo/vertical-white-png.png',
+        url: "/Images/horizontal.png",
         width: 1200,
         height: 630,
-        alt: 'Jake McIntosh — Founder and Director of Cloudhaus',
+        alt: "Cloudhaus — Adelaide Architectural & Construction Visual Studio",
       },
     ],
-    locale: 'en_AU',
-    type: 'website',
+    locale: "en_AU",
+    type: "website",
   },
 
   twitter: {
-    card: 'summary_large_image',
-    title: 'About | Cloudhaus',
+    card: "summary_large_image",
+    title: "About Cloudhaus | Adelaide Visual Studio",
     description:
-      'Cloudhaus is a visual studio creating cinematic films and photography for high-end architecture and construction.',
-    images: ['https://cloudhausmedia.com/Assets/Logo/vertical-white-png.png'],
+      "Meet Cloudhaus, an Adelaide visual studio creating cinematic films and high-end photography for architecture, construction and design.",
+    images: ["/Images/horizontal.png"],
   },
-}
+};
 
 export default function Layout({ children }) {
   return (
