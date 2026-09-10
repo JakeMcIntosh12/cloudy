@@ -232,7 +232,7 @@ function Testimonials() {
             <div className="flex flex-row items-center justify-between w-full">
               <div className="text-[clamp(0.625rem,1vw,0.75rem)] flex items-center gap-[clamp(0.375rem,1vw,0.5rem)] text-zinc-500 font-medium">
                 <div className="w-[clamp(0.25rem,0.6vw,0.375rem)] h-[clamp(0.25rem,0.6vw,0.375rem)] bg-lavender" />
-                <span>TESTIMONIALS</span>
+                <h2>TESTIMONIALS</h2>
               </div>
 
               <div className="flex flex-row items-center justify-start gap-[clamp(0.35rem,1vw,0.5rem)] text-[clamp(0.8rem,1.4vw,1rem)] font-bold">
@@ -358,13 +358,13 @@ function Testimonials() {
                 will-change-[transform,opacity,filter]
               "
             >
-              <h1 className="text-[clamp(1rem,2.2vw,1.5rem)] text-ghost-white font-regular uppercase">
+              <h3 className="text-[clamp(1rem,2.2vw,1.5rem)] text-ghost-white font-regular uppercase">
                 {currentTestimonial.company}
-              </h1>
+              </h3>
 
-              <h1 className="text-[clamp(0.7rem,1.3vw,0.95rem)] text-zinc-500 opacity-80 font-medium uppercase w-full">
+              <p className="text-[clamp(0.7rem,1.3vw,0.95rem)] text-zinc-500 opacity-80 font-medium uppercase w-full">
                 {currentTestimonial.role}
-              </h1>
+              </p>
             </div>
 
           </div>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useRef } from "react";
@@ -146,12 +147,12 @@ function ServiceItem({ service }) {
           <div className="flex flex-row items-start justify-between w-full">
             {/* TITLE WITH EXTRUDED ELEVATION CONTAINER */}
             <div className="flex items-start w-full md:translate-x-40 overflow-hidden py-1">
-              <h1
+              <h3
                 ref={titleRef}
                 className="text-[clamp(2rem,4.5vw+0.4rem,4rem)] font-sans uppercase tracking-tighter text-ghost-white font-medium leading-[1.05]"
               >
                 {service.title}
-              </h1>
+              </h3>
             </div>
 
             {/* ARROW */}
@@ -191,11 +192,12 @@ export default function ServicesSection() {
       <div className="flex flex-row items-center justify-between w-full">
         <div className="font-mono tracking-tight text-[clamp(0.5rem,0.8vw,0.625rem)] flex items-center gap-2">
           <div className="w-2 h-2 bg-ghost-white" />
-          <h1>OUR SERVICES</h1>
+          <h2>OUR SERVICES</h2>
         </div>
-        <h1 className="font-mono tracking-tight text-[clamp(0.5rem,0.8vw,0.625rem)]">
+
+        <span className="font-mono tracking-tight text-[clamp(0.5rem,0.8vw,0.625rem)]">
           [CLOUD_3]
-        </h1>
+        </span>
       </div>
 
       {/* MAPPED SERVICES */}
@@ -207,3 +209,4 @@ export default function ServicesSection() {
     </div>
   );
 }
+

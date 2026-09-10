@@ -28,6 +28,90 @@ const ABOUT_CONTENT_QUERY = `
 `
 
 /* =========================================================
+   STRUCTURED DATA
+   ========================================================= */
+
+const aboutPageSchema = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'AboutPage',
+      '@id': 'https://cloudhausmedia.com/About#webpage',
+      url: 'https://cloudhausmedia.com/About',
+      name: 'About Cloudhaus | Adelaide Visual Studio',
+      description:
+        'Meet Cloudhaus, an Adelaide visual studio creating cinematic films and high-end photography for architecture, construction and design.',
+      inLanguage: 'en-AU',
+
+      about: {
+        '@id': 'https://cloudhausmedia.com/#organization',
+      },
+
+      mainEntity: {
+        '@id': 'https://cloudhausmedia.com/#organization',
+      },
+
+      isPartOf: {
+        '@id': 'https://cloudhausmedia.com/#website',
+      },
+    },
+
+    {
+      '@type': 'Person',
+      '@id': 'https://cloudhausmedia.com/#jake-mcintosh',
+      name: 'Jake McIntosh',
+      jobTitle: 'Founder and Director',
+      worksFor: {
+        '@id': 'https://cloudhausmedia.com/#organization',
+      },
+      url: 'https://cloudhausmedia.com/About',
+      image: 'https://cloudhausmedia.com/Images/JAKE.png',
+    },
+
+    {
+      '@type': 'Organization',
+      '@id': 'https://cloudhausmedia.com/#organization',
+      name: 'Cloudhaus',
+      url: 'https://cloudhausmedia.com/',
+      description:
+        'Cloudhaus is an Adelaide visual studio creating cinematic films and high-end photography for architecture, construction and design.',
+      founder: {
+        '@id': 'https://cloudhausmedia.com/#jake-mcintosh',
+      },
+      areaServed: {
+        '@type': 'City',
+        name: 'Adelaide',
+        containedInPlace: {
+          '@type': 'State',
+          name: 'South Australia',
+        },
+      },
+      knowsAbout: [
+        'Architectural photography',
+        'Construction photography',
+        'Architectural film',
+        'Construction film',
+        'Visual storytelling',
+        'Architecture',
+        'Construction',
+        'Design',
+      ],
+    },
+
+    {
+      '@type': 'WebSite',
+      '@id': 'https://cloudhausmedia.com/#website',
+      url: 'https://cloudhausmedia.com/',
+      name: 'Cloudhaus',
+      inLanguage: 'en-AU',
+      publisher: {
+        '@id': 'https://cloudhausmedia.com/#organization',
+      },
+    },
+  ],
+}
+
+/* =========================================================
    SPLIT LINES REVEAL
    ========================================================= */
 
@@ -36,17 +120,17 @@ function ExtrudedTextReveal({ text }) {
 
   useGSAP(
     () => {
-      const element = containerRef.current?.querySelector('[data-split-text]')
+      const element =
+        containerRef.current?.querySelector('[data-split-text]')
 
       if (!element || !text) return
 
-      // Split text strictly into line blocks
       const split = new SplitText(element, {
         type: 'lines',
-        linesClass: 'sky-line relative block overflow-hidden py-[0.05em]',
+        linesClass:
+          'sky-line relative block overflow-hidden py-[0.05em]',
       })
 
-      // Set initial hidden transform & filter state
       gsap.set(split.lines, {
         opacity: 0,
         yPercent: 120,
@@ -56,7 +140,6 @@ function ExtrudedTextReveal({ text }) {
         force3D: true,
       })
 
-      // Sequential line reveal animation
       gsap.to(split.lines, {
         opacity: 1,
         yPercent: 0,
@@ -163,7 +246,7 @@ function ImageReveal() {
       <Image
         ref={imageRef}
         src="/Images/JAKE.png"
-        alt="Jake McIntosh, founder and director of Cloudhaus"
+        alt="Jake McIntosh, Founder and Director of Cloudhaus"
         fill
         priority
         quality={80}
@@ -210,7 +293,8 @@ export default function Page() {
     () => {
       if (!bottomContentRef.current) return
 
-      const elements = bottomContentRef.current.querySelectorAll('h1, a')
+      const elements =
+        bottomContentRef.current.querySelectorAll('h1, a')
 
       if (!elements.length) return
 
@@ -291,7 +375,8 @@ export default function Page() {
 
     const lenis = new Lenis({
       duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      easing: (t) =>
+        Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
       touchMultiplier: 2,
     })
@@ -320,11 +405,22 @@ export default function Page() {
       className="
         w-full
         min-h-dvh
-        bg-carbon-black
+        bg-black
         p-4
         md:p-8
       "
     >
+      {/* =================================================
+          STRUCTURED DATA
+      ================================================= */}
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(aboutPageSchema),
+        }}
+      />
+
       {/* =================================================
           NAVIGATION
       ================================================= */}
@@ -335,7 +431,7 @@ export default function Page() {
           PAGE CONTENT
       ================================================= */}
 
-      <div
+      <main
         className="
           grid
           grid-cols-1
@@ -352,7 +448,7 @@ export default function Page() {
             LEFT CONTENT
         ================================================= */}
 
-        <div
+        <section
           className="
             flex
             flex-col
@@ -360,6 +456,7 @@ export default function Page() {
             lg:col-span-7
             w-full
           "
+          aria-labelledby="about-cloudhaus-heading"
         >
           {/* =================================================
               ABOUT CLOUDHAUS
@@ -379,14 +476,25 @@ export default function Page() {
             >
               <div className="w-2 h-2 bg-ghost-white" />
 
-              <h1>ABOUT CLOUDHAUS</h1>
+              <h1 id="about-cloudhaus-heading">
+                ABOUT CLOUDHAUS
+              </h1>
             </div>
 
             {/* SPLIT LINE REVEAL */}
 
-            <ExtrudedTextReveal
-              text={aboutContent?.aboutText || ''}
-            />
+            <div
+              aria-label={
+                aboutContent?.aboutText ||
+                'Cloudhaus is an Adelaide visual studio creating cinematic films and high-end photography for architecture, construction and design.'
+              }
+            >
+              <ExtrudedTextReveal
+                text={
+                  aboutContent?.aboutText 
+                }
+              />
+            </div>
           </div>
 
           {/* =================================================
@@ -410,11 +518,13 @@ export default function Page() {
               >
                 <div className="w-2 h-2 bg-ghost-white" />
 
-                <h2 className="text-zinc-700">CONTACT</h2>
+                <h2 className="text-zinc-700">
+                  CONTACT
+                </h2>
               </div>
 
               <div className="flex flex-col space-y-3 w-full">
-                <div
+                <address
                   className="
                     flex
                     flex-col
@@ -422,17 +532,27 @@ export default function Page() {
                     text-ghost-white
                     text-[clamp(0.85rem,1.2vw,1rem)]
                     uppercase
+                    not-italic
                   "
                 >
                   <p>0404 104 360</p>
                   <p>ADELAIDE, SOUTH AUSTRALIA</p>
+
                   <a
-                    className="hover:text-zinc-600 hover:font-medium transition trransition-all duration-500 break-words md:w-auto"
+                    className="
+                      hover:text-zinc-600
+                      hover:font-medium
+                      transition
+                      trransition-all
+                      duration-500
+                      break-words
+                      md:w-auto
+                    "
                     href="mailto:hello@cloudhausmedia.com"
                   >
                     hello@cloudhausmedia.com
                   </a>
-                </div>
+                </address>
               </div>
             </div>
 
@@ -452,25 +572,29 @@ export default function Page() {
               >
                 <div className="w-2 h-2 bg-ghost-white" />
 
-                <h2 className="text-zinc-700">SERVICES</h2>
+                <h2 className="text-zinc-700">
+                  SERVICES
+                </h2>
               </div>
 
               <div className="flex flex-col space-y-3 w-full">
-                <div
+                <ul
                   className="
                     flex
                     flex-col
+                    space-y-0
                     font-sans
                     text-ghost-white
                     text-[clamp(0.85rem,1.2vw,1rem)]
                     uppercase
                   "
+                  aria-label="Cloudhaus services"
                 >
-                  <p>PRE-PRODUCTION</p>
-                  <p>PRODUCTION</p>
-                  <p>POST-PRODUCTION</p>
-                  <p>AI IN MOTION</p>
-                </div>
+                  <li>PRE-PRODUCTION</li>
+                  <li>PRODUCTION</li>
+                  <li>POST-PRODUCTION</li>
+                  <li>AI IN MOTION</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -492,7 +616,9 @@ export default function Page() {
             >
               <div className="w-2 h-2 bg-ghost-white" />
 
-              <h2 className="text-zinc-700 font-mono">SOCIALS</h2>
+              <h2 className="text-zinc-700 font-mono">
+                SOCIALS
+              </h2>
             </div>
 
             <div className="flex flex-col space-y-3 w-full font-sans">
@@ -533,13 +659,13 @@ export default function Page() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* =================================================
             RIGHT IMAGE
         ================================================= */}
 
-        <div
+        <section
           className="
             flex
             flex-col
@@ -550,10 +676,12 @@ export default function Page() {
             lg:items-end
             lg:pr-4
           "
+          aria-labelledby="jake-mcintosh-heading"
         >
           <ImageReveal />
 
-          <h1
+          <h2
+            id="jake-mcintosh-heading"
             className="
               font-geist-mono
               font-medium
@@ -568,15 +696,15 @@ export default function Page() {
             "
           >
             JAKE MCINTOSH - FOUNDER & DIRECTOR OF CLOUDHAUS
-          </h1>
-        </div>
-      </div>
+          </h2>
+        </section>
+      </main>
 
       {/* =================================================
           BOTTOM CONTENT
       ================================================= */}
 
-      <div
+      <footer
         ref={bottomContentRef}
         className="
           flex
@@ -616,9 +744,11 @@ export default function Page() {
               space-x-[clamp(0.5rem,4.5vw,6rem)]
             "
           >
-            <h1>BASED IN ADELAIDE</h1>
+            <p>BASED IN ADELAIDE</p>
 
-            <h1>ARCHITECTURE / CONSTRUCTION / MEDIA</h1>
+            <p>
+              ARCHITECTURE / CONSTRUCTION / MEDIA
+            </p>
           </div>
 
           <div
@@ -662,12 +792,15 @@ export default function Page() {
           "
         >
           <BlurFlicker>
-            <TransitionLink href="/" className="font-bold">
+            <TransitionLink
+              href="/"
+              className="font-bold"
+            >
               BACK TO HOME
             </TransitionLink>
           </BlurFlicker>
         </div>
-      </div>
+      </footer>
     </div>
   )
 }

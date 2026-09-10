@@ -665,12 +665,12 @@ function Footer() {
             <div className="flex flex-col md:flex-row space-y-0 space-x-[clamp(0.5rem,4.5vw,6rem)]">
               <span data-footer-meta>BASED IN ADELAIDE</span>
 
-              <h2
+              <span
                 data-footer-meta
                 className="hover:opacity-70 transition-opacity"
               >
                 ARCHITECTURE / CONSTRUCTION / MORE
-              </h2>
+              </span>
             </div>
 
             <div className="flex flex-col md:flex-row space-y-0 space-x-[clamp(0.5rem,4.5vw,6rem)]">

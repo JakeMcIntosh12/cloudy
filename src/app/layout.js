@@ -1,4 +1,3 @@
-
 import {
   Geist,
   Geist_Mono,
@@ -99,13 +98,71 @@ export const metadata = {
   },
 };
 
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+
+  "@id": "https://cloudhausmedia.com/#organization",
+
+  name: "Cloudhaus",
+
+  url: "https://cloudhausmedia.com/",
+
+  logo: {
+    "@type": "ImageObject",
+    url: "https://cloudhausmedia.com/Assets/Logo/vertical-white-png.png",
+  },
+
+  description:
+    "Cloudhaus is an Adelaide visual studio creating high-end photography and cinematic films for architecture, construction and design.",
+
+  founder: {
+    "@type": "Person",
+    "@id": "https://cloudhausmedia.com/#jake-mcintosh",
+    name: "Jake McIntosh",
+    jobTitle: "Founder and Director",
+    worksFor: {
+      "@id": "https://cloudhausmedia.com/#organization",
+    },
+  },
+
+  areaServed: {
+    "@type": "City",
+    name: "Adelaide",
+    containedInPlace: {
+      "@type": "State",
+      name: "South Australia",
+    },
+  },
+
+  knowsAbout: [
+    "Architectural photography",
+    "Construction photography",
+    "Architectural film",
+    "Construction film",
+    "Architecture",
+    "Construction",
+    "Design",
+    "Visual storytelling",
+  ],
+
+  sameAs: [],
+};
+
 export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${plusJakartaSans.variable} ${fragmentMono.variable} antialiased`}
     >
-      <head />
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationSchema),
+          }}
+        />
+      </head>
 
       <body className="min-h-full flex flex-col">
         <TransitionOverlay />
@@ -123,4 +180,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-
