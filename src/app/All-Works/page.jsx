@@ -255,10 +255,10 @@ function useHlsVideo(
                     true,
 
                   maxBufferLength:
-                    8,
+                    15,
 
                   maxMaxBufferLength:
-                    20,
+                    30,
 
                   startLevel: -1,
                 });
@@ -917,6 +917,30 @@ function WorkCard({
   const isHoveredRef =
     useRef(false);
 
+  // --------------------------------------------------
+  // Tracks whether handleLoadedMetadata kicked off a
+  // random-start seek that we still need to wait out
+  // before revealing the video. Without this, the poster
+  // fades away on "loadeddata" while the seek is still in
+  // flight, and the visible frame briefly goes blank until
+  // the seek actually lands — the flicker you were seeing.
+  // --------------------------------------------------
+
+  const didSeekRef =
+    useRef(false);
+
+  // --------------------------------------------------
+  // Only ever set to true right before WE deliberately
+  // call video.pause() (on mouse leave). Any 'pause' event
+  // that fires while this is false — but the card is still
+  // hovered — is spurious (a stalled buffer, an interrupted
+  // play() promise, etc.) and gets resumed automatically so
+  // hovering never results in playback silently stopping.
+  // --------------------------------------------------
+
+  const intentionalPauseRef =
+    useRef(false);
+
   const isMobile =
     useIsMobileViewport();
 
@@ -952,6 +976,7 @@ function WorkCard({
     setVideoUrl(null);
     setVideoReady(false);
     setCurrentTime("00:00");
+    didSeekRef.current = false;
   }, [rawUrl]);
 
   // --------------------------------------------------
@@ -981,6 +1006,7 @@ function WorkCard({
 
         setHasVideoError(false);
         setVideoReady(false);
+        didSeekRef.current = false;
 
         setVideoUrl(
           rawUrl
@@ -1012,6 +1038,11 @@ function WorkCard({
 
   // --------------------------------------------------
   // VIDEO METADATA
+  //
+  // Kicks off a seek to a random point so every card isn't
+  // showing frame 0. We record that a seek is in flight so
+  // the reveal logic below waits for it to actually finish
+  // instead of firing on the first available frame.
   // --------------------------------------------------
 
   const handleLoadedMetadata =
@@ -1026,17 +1057,26 @@ function WorkCard({
         ) &&
         videoEl.duration > 0
       ) {
+        didSeekRef.current = true;
+
         videoEl.currentTime =
           Math.random() *
           videoEl.duration;
+      } else {
+        didSeekRef.current = false;
       }
     };
 
   // --------------------------------------------------
-  // VIDEO READY
+  // REVEAL VIDEO
+  //
+  // Single source of truth for swapping poster -> video.
+  // Only ever called once the frame actually on screen is
+  // the one we want the user to see (post-seek, or
+  // immediately if there was nothing to seek to).
   // --------------------------------------------------
 
-  const handleVideoReady =
+  const revealVideo =
     useCallback(() => {
       const videoEl =
         videoRef.current;
@@ -1064,8 +1104,43 @@ function WorkCard({
           );
         }
       );
-    },
-    []);
+    }, []);
+
+  // --------------------------------------------------
+  // VIDEO READY (first frame available)
+  //
+  // If a random-start seek was requested, do NOT reveal
+  // here — wait for handleSeeked instead, since the frame
+  // available right now is still the pre-seek frame.
+  // --------------------------------------------------
+
+  const handleVideoReady =
+    useCallback(() => {
+      if (didSeekRef.current) {
+        return;
+      }
+
+      revealVideo();
+    }, [revealVideo]);
+
+  // --------------------------------------------------
+  // SEEK COMPLETE
+  //
+  // Fires once the random-start seek has actually landed
+  // on its target frame. This is the safe moment to swap
+  // from poster to video with no blank frame in between.
+  // --------------------------------------------------
+
+  const handleSeeked =
+    useCallback(() => {
+      if (!didSeekRef.current) {
+        return;
+      }
+
+      didSeekRef.current = false;
+
+      revealVideo();
+    }, [revealVideo]);
 
   // --------------------------------------------------
   // VIDEO TIME
@@ -1086,6 +1161,42 @@ function WorkCard({
     };
 
   // --------------------------------------------------
+  // SELF-HEALING PAUSE
+  //
+  // If the video pauses on its own while the card is still
+  // hovered (buffer stall, an interrupted play() promise, a
+  // browser quirk mid-HLS-attach) — as opposed to us calling
+  // pause() deliberately on mouse leave — immediately resume
+  // playback instead of leaving it stuck paused.
+  // --------------------------------------------------
+
+  const handleVideoPause =
+    useCallback(() => {
+      if (
+        intentionalPauseRef.current
+      ) {
+        return;
+      }
+
+      if (
+        !isHoveredRef.current
+      ) {
+        return;
+      }
+
+      const videoEl =
+        videoRef.current;
+
+      if (!videoEl) {
+        return;
+      }
+
+      videoEl
+        .play()
+        .catch(() => {});
+    }, []);
+
+  // --------------------------------------------------
   // HOVER ENTER
   // --------------------------------------------------
 
@@ -1093,6 +1204,9 @@ function WorkCard({
     async () => {
       isHoveredRef.current =
         true;
+
+      intentionalPauseRef.current =
+        false;
 
       let source =
         videoUrl;
@@ -1131,7 +1245,10 @@ function WorkCard({
           "auto",
       });
 
-      if (videoRef.current) {
+      if (
+        videoRef.current &&
+        videoReady
+      ) {
         videoRef.current
           .play()
           .catch(() => {});
@@ -1148,6 +1265,9 @@ function WorkCard({
     () => {
       isHoveredRef.current =
         false;
+
+      intentionalPauseRef.current =
+        true;
 
       onHoverChange(
         false,
@@ -1311,7 +1431,11 @@ function WorkCard({
           ${heightClassName || ""}
         `}
       >
-        {/* BUNNY POSTER */}
+        {/* BUNNY POSTER
+
+            Stays mounted and fully opaque until videoReady flips
+            to true from handleSeeked (or handleVideoReady when no
+            seek was needed) — never hidden early. */}
 
         {posterUrl && (
           <img
@@ -1372,8 +1496,14 @@ function WorkCard({
             onLoadedData={
               handleVideoReady
             }
+            onSeeked={
+              handleSeeked
+            }
             onTimeUpdate={
               handleTimeUpdate
+            }
+            onPause={
+              handleVideoPause
             }
             className={`
               absolute
@@ -1944,6 +2074,12 @@ export default function AllWorksSection() {
   const bgPlayRequestedRef =
     useRef(false);
 
+  // Same self-heal pattern as the grid cards: only true right
+  // before WE deliberately pause the background video. Any other
+  // 'pause' while it's still supposed to be playing gets resumed.
+  const bgIntentionalPauseRef =
+    useRef(false);
+
   const noiseRef =
     useRef(null);
 
@@ -2004,6 +2140,9 @@ export default function AllWorksSection() {
           setDisplayProject(
             null
           );
+
+          bgIntentionalPauseRef.current =
+            true;
 
           if (
             bgVideoRef.current
@@ -2470,6 +2609,9 @@ export default function AllWorksSection() {
       bgProjectIdRef.current ===
         projectId
     ) {
+      bgIntentionalPauseRef.current =
+        false;
+
       bgPlayRequestedRef.current =
         true;
 
@@ -2489,6 +2631,9 @@ export default function AllWorksSection() {
 
     bgProjectIdRef.current =
       projectId;
+
+    bgIntentionalPauseRef.current =
+      false;
 
     bgPlayRequestedRef.current =
       true;
@@ -2710,6 +2855,40 @@ export default function AllWorksSection() {
   ]);
 
   // ------------------------------------------------------------------
+  // BACKGROUND VIDEO SELF-HEALING PAUSE
+  //
+  // If the background video pauses on its own while it's still
+  // supposed to be the active hover preview — as opposed to us
+  // deliberately pausing it — resume playback immediately.
+  // ------------------------------------------------------------------
+
+  const handleBgVideoPause =
+    useCallback(() => {
+      if (
+        bgIntentionalPauseRef.current
+      ) {
+        return;
+      }
+
+      if (
+        !bgPlayRequestedRef.current
+      ) {
+        return;
+      }
+
+      const video =
+        bgVideoRef.current;
+
+      if (!video) {
+        return;
+      }
+
+      video
+        .play()
+        .catch(() => {});
+    }, []);
+
+  // ------------------------------------------------------------------
   // BACKGROUND VIDEO STALL RECOVERY
   // ------------------------------------------------------------------
   //
@@ -2865,6 +3044,9 @@ export default function AllWorksSection() {
 
   useEffect(() => {
     return () => {
+      bgIntentionalPauseRef.current =
+        true;
+
       bgPlayRequestedRef.current =
         false;
 
@@ -3004,6 +3186,9 @@ export default function AllWorksSection() {
             playsInline
             autoPlay
             preload="auto"
+            onPause={
+              handleBgVideoPause
+            }
             className="
               absolute
               inset-0

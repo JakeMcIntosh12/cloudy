@@ -126,6 +126,7 @@ function ServiceItem({ service }) {
   return (
     <div
       ref={containerRef}
+      id="services"
       className="flex flex-col space-y-8 md:space-y-6 w-full pointer-events-none"
     >
       {/* HEADER & CONTENT ROW */}
