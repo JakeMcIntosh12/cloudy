@@ -1,5 +1,5 @@
 export default function sitemap() {
-  const baseUrl = "https://www.cloudhausmedia.com";
+  const baseUrl = "https://cloudhausmedia.com";
 
   return [
     {

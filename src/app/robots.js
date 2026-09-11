@@ -4,6 +4,6 @@ export default function robots() {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://www.cloudhausmedia.com/sitemap.xml',
+    sitemap: 'https://cloudhausmedia.com/sitemap.xml',
   }
 }
