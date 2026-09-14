@@ -1,20 +1,20 @@
-"use client";
+'use client'
 
-import React, { useEffect, useRef } from "react";
-import Image from "next/image";
-import gsap from "gsap";
+import React, { useEffect, useRef } from 'react'
+import Image from 'next/image'
+import gsap from 'gsap'
 
-import KRIVICLogo from "@/Assets/Logo/KRIVIC.svg";
-import MorganBuildLogo from "@/Assets/Logo/MorganBuild.svg";
-import CircaLogo from "@/Assets/Logo/circa-white.svg";
-import Client4Logo from "@/Assets/Logo/TBC.svg";
-import Client5Logo from "@/Assets/Logo/4Life-Constructions.svg";
-import Client6Logo from "@/Assets/Logo/NBEE.svg";
+import KRIVICLogo from '@/Assets/Logo/KRIVIC.svg'
+import MorganBuildLogo from '@/Assets/Logo/MorganBuild.svg'
+import CircaLogo from '@/Assets/Logo/circa-white.svg'
+import Client4Logo from '@/Assets/Logo/TBC.svg'
+import Client5Logo from '@/Assets/Logo/4Life-Constructions.svg'
+import Client6Logo from '@/Assets/Logo/NBEE.svg'
 
 function ClientsSection() {
-  const trackRef = useRef(null);
-  const blurTweenRef = useRef(null);
-  const wheelRAFRef = useRef(null);
+  const trackRef = useRef(null)
+  const blurTweenRef = useRef(null)
+  const wheelRAFRef = useRef(null)
 
   // =========================================================
   // CLIENT LOGOS
@@ -22,118 +22,104 @@ function ClientsSection() {
 
   const clients = [
     {
-      name: "KRIVIC",
+      name: 'KRIVIC',
       src: KRIVICLogo,
       logoClass:
-        "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+        'w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]',
     },
     {
-      name: "Morgan Build",
+      name: 'Morgan Build',
       src: MorganBuildLogo,
       logoClass:
-        "w-[clamp(10rem,16vw,18rem)] h-[clamp(5rem,9vw,9rem)]",
+        'w-[clamp(10rem,16vw,18rem)] h-[clamp(5rem,9vw,9rem)]',
     },
     {
-      name: "Circa",
+      name: 'Circa',
       src: CircaLogo,
       logoClass:
-        "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+        'w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]',
     },
     {
-      name: "TBC",
+      name: 'TBC',
       src: Client4Logo,
       logoClass:
-        "w-[clamp(9rem,13vw,14rem)] h-[clamp(5rem,8vw,8rem)]",
+        'w-[clamp(9rem,13vw,14rem)] h-[clamp(5rem,8vw,8rem)]',
     },
     {
-      name: "4Life Constructions",
+      name: '4Life Constructions',
       src: Client5Logo,
       logoClass:
-        "w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]",
+        'w-[clamp(8rem,12vw,13rem)] h-[clamp(4rem,7vw,7rem)]',
     },
     {
-      name: "NB",
+      name: 'NB',
       src: Client6Logo,
       logoClass:
-        "w-[clamp(11rem,16vw,16rem)] h-[clamp(7rem,10vw,11rem)] scale-[1.35]",
+        'w-[clamp(11rem,16vw,16rem)] h-[clamp(7rem,10vw,11rem)] scale-[1.35]',
     },
-  ];
+  ]
 
   // =========================================================
   // PRELOAD ALL LOGOS IMMEDIATELY
-  // =========================================================
-  //
-  // These logos are local SVG assets, so we can request them
-  // as soon as this component mounts rather than waiting for
-  // the section to enter the viewport.
-  //
-  // The browser will cache these requests, meaning when the
-  // actual <Image> elements render later, the assets should
-  // already be available.
-  //
   // =========================================================
 
   useEffect(() => {
     const preloadLogos = clients
       .map((client) => {
-        if (!client.src) return null;
+        if (!client.src) return null
 
-        const link = document.createElement("link");
+        const link = document.createElement('link')
 
-        link.rel = "preload";
-        link.as = "image";
-        link.href = client.src.src || client.src;
+        link.rel = 'preload'
+        link.as = 'image'
+        link.href = client.src.src || client.src
+        link.fetchPriority = 'high'
 
-        // SVG images don't need a fetch priority attribute in
-        // every browser, but this helps browsers that support it.
-        link.fetchPriority = "high";
+        document.head.appendChild(link)
 
-        document.head.appendChild(link);
-
-        return link;
+        return link
       })
-      .filter(Boolean);
+      .filter(Boolean)
 
-    // Also warm the browser's image cache directly.
     const imagePreloads = clients
       .map((client) => {
-        if (!client.src) return null;
+        if (!client.src) return null
 
-        const image = new window.Image();
+        const image = new window.Image()
 
-        image.decoding = "async";
-        image.fetchPriority = "high";
-        image.src = client.src.src || client.src;
+        image.decoding = 'async'
+        image.fetchPriority = 'high'
+        image.src = client.src.src || client.src
 
-        return image;
+        return image
       })
-      .filter(Boolean);
+      .filter(Boolean)
 
     return () => {
       preloadLogos.forEach((link) => {
         if (link.parentNode) {
-          link.parentNode.removeChild(link);
+          link.parentNode.removeChild(link)
         }
-      });
+      })
 
       imagePreloads.forEach((image) => {
-        image.onload = null;
-        image.onerror = null;
-      });
-    };
-  }, []);
+        image.onload = null
+        image.onerror = null
+      })
+    }
+  }, [])
 
   // =========================================================
   // INFINITE CAROUSEL
   // =========================================================
 
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
+    const track = trackRef.current
+    if (!track) return
 
     const ctx = gsap.context(() => {
-      const items = track.children;
-      const totalWidth = track.scrollWidth / 2;
+      const items = track.children
+      const totalWidth = track.scrollWidth / 2
 
       // =========================================================
       // INFINITE CAROUSEL
@@ -142,49 +128,45 @@ function ClientsSection() {
       const loop = gsap.to(items, {
         x: `-=${totalWidth}`,
         duration: 25,
-        ease: "none",
+        ease: 'none',
         repeat: -1,
         modifiers: {
           x: gsap.utils.unitize((x) => {
-            const val = parseFloat(x);
-            return ((val % totalWidth) - totalWidth) % totalWidth;
+            const val = parseFloat(x)
+            return ((val % totalWidth) - totalWidth) % totalWidth
           }),
         },
-      });
+      })
 
-      // Wrap the timeline's progress continuously so playing
-      // in reverse never hits 0.
-      loop.eventCallback("onUpdate", () => {
+      loop.eventCallback('onUpdate', () => {
         if (loop.totalProgress() <= 0) {
-          loop.totalProgress(loop.totalProgress() + 1);
+          loop.totalProgress(loop.totalProgress() + 1)
         }
-      });
+      })
 
       // =========================================================
       // SCROLL VELOCITY / DIZZINESS EFFECT
       // =========================================================
 
-      let latestDelta = 0;
+      let latestDelta = 0
 
       const applyWheelEffect = () => {
-        wheelRAFRef.current = null;
+        wheelRAFRef.current = null
 
-        const delta = latestDelta;
+        const delta = latestDelta
 
-        if (!delta) return;
+        if (!delta) return
 
-        // Scroll down = right to left
-        // Scroll up = left to right
-        const direction = delta > 0 ? 1 : -1;
+        const direction = delta > 0 ? 1 : -1
 
-        const speedBoost = Math.min(Math.abs(delta) / 20, 5);
-        const targetTimeScale = direction * (1 + speedBoost);
+        const speedBoost = Math.min(Math.abs(delta) / 20, 5)
+        const targetTimeScale = direction * (1 + speedBoost)
 
-        const blur = Math.min(Math.abs(delta) / 8, 20);
+        const blur = Math.min(Math.abs(delta) / 8, 20)
 
         if (blurTweenRef.current) {
-          blurTweenRef.current.kill();
-          blurTweenRef.current = null;
+          blurTweenRef.current.kill()
+          blurTweenRef.current = null
         }
 
         // -------------------------------------------------------
@@ -194,9 +176,9 @@ function ClientsSection() {
         gsap.to(loop, {
           timeScale: targetTimeScale,
           duration: 0.1,
-          ease: "power2.out",
+          ease: 'power2.out',
           overwrite: true,
-        });
+        })
 
         // -------------------------------------------------------
         // BLUR
@@ -205,77 +187,77 @@ function ClientsSection() {
         gsap.to(track, {
           filter: `blur(${blur}px)`,
           duration: 0.08,
-          ease: "power2.out",
+          ease: 'power2.out',
           overwrite: true,
-        });
+        })
 
         // -------------------------------------------------------
         // RETURN TO NORMAL
         // -------------------------------------------------------
 
-        const timeline = gsap.timeline();
+        const timeline = gsap.timeline()
 
         timeline
           .to(loop, {
             timeScale: direction,
             duration: 0.6,
-            ease: "power2.out",
+            ease: 'power2.out',
           })
           .to(
             track,
             {
-              filter: "blur(0px)",
+              filter: 'blur(0px)',
               duration: 0.3,
-              ease: "power3.out",
+              ease: 'power3.out',
             },
-            "<",
-          );
+            '<'
+          )
 
-        blurTweenRef.current = timeline;
-      };
+        blurTweenRef.current = timeline
+      }
 
       // =========================================================
       // THROTTLED WHEEL HANDLER
       // =========================================================
 
       const handleWheel = (event) => {
-        latestDelta = event.deltaY;
+        latestDelta = event.deltaY
 
-        if (wheelRAFRef.current !== null) return;
+        if (wheelRAFRef.current !== null) return
 
         wheelRAFRef.current =
-          requestAnimationFrame(applyWheelEffect);
-      };
+          requestAnimationFrame(applyWheelEffect)
+      }
 
-      window.addEventListener("wheel", handleWheel, {
+      window.addEventListener('wheel', handleWheel, {
         passive: true,
-      });
+      })
 
       // =========================================================
       // CLEANUP
       // =========================================================
 
       return () => {
-        window.removeEventListener("wheel", handleWheel);
+        window.removeEventListener('wheel', handleWheel)
 
         if (wheelRAFRef.current !== null) {
-          cancelAnimationFrame(wheelRAFRef.current);
-          wheelRAFRef.current = null;
+          cancelAnimationFrame(wheelRAFRef.current)
+          wheelRAFRef.current = null
         }
 
         if (blurTweenRef.current) {
-          blurTweenRef.current.kill();
-          blurTweenRef.current = null;
+          blurTweenRef.current.kill()
+          blurTweenRef.current = null
         }
 
-        loop.kill();
+        loop.kill()
 
-        gsap.killTweensOf(track);
-      };
-    }, trackRef);
+        gsap.killTweensOf(track)
+      }
+    }, trackRef)
 
-    return () => ctx.revert();
-  }, []);
+    return () => ctx.revert()
+  }, [])
 
   // =========================================================
   // LOGO CARD
@@ -288,9 +270,7 @@ function ClientsSection() {
         w-[clamp(13rem,45vw,23rem)]
         h-[clamp(8rem,20vw,15rem)]
         shrink-0
-        border
-        border-eclipse
-        bg-carbon-black
+        bg-[#0D0D0D]
         flex
         items-center
         justify-center
@@ -317,7 +297,7 @@ function ClientsSection() {
         />
       </div>
     </div>
-  );
+  )
 
   return (
     <div className="w-screen relative left-1/2 -translate-x-1/2 bg-black mt-[clamp(0.1rem,4vw,0.2rem)] overflow-hidden mb-10 md:mb-20">
@@ -355,24 +335,24 @@ function ClientsSection() {
 
           <div
             ref={trackRef}
-            className="flex flex-row space-x-[clamp(1rem,2vw,1.5rem)] w-max will-change-transform"
+            className="flex flex-row space-x-[clamp(1rem,1.5vw,1.1rem)] w-max will-change-transform"
           >
             {/* Original Set */}
 
             {clients.map((client, i) =>
-              renderLogo(client, i, 1),
+              renderLogo(client, i, 1)
             )}
 
             {/* Duplicated Set */}
 
             {clients.map((client, i) =>
-              renderLogo(client, i, 2),
+              renderLogo(client, i, 2)
             )}
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default ClientsSection;
+export default ClientsSection

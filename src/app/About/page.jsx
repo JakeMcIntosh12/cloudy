@@ -11,6 +11,7 @@ import TransitionLink from '@/components/PageTransitions/TransitionLink'
 import BlurFlicker from '@/components/Animations/BlurFlicker'
 import { useGSAP } from '@gsap/react'
 import { client } from '@/lib/client'
+import BottomContent from '@/components/Sections/SmallFooter'
 
 gsap.registerPlugin(SplitText, ScrollTrigger)
 
@@ -168,7 +169,7 @@ function ExtrudedTextReveal({ text }) {
         className="
           text-ghost-white
           w-full
-          text-[clamp(1.25rem,2.1vw,2.25rem)]
+          text-[clamp(1.25rem,2.1vw,2.35rem)]
           tracking-tight
           leading-[130%]
           uppercase
@@ -452,7 +453,7 @@ export default function Page() {
           className="
             flex
             flex-col
-            space-y-18
+            space-y-22
             lg:col-span-7
             w-full
           "
@@ -704,103 +705,7 @@ export default function Page() {
           BOTTOM CONTENT
       ================================================= */}
 
-      <footer
-        ref={bottomContentRef}
-        className="
-          flex
-          flex-col-reverse
-          md:flex-row
-          items-start
-          md:items-end
-          justify-between
-          font-geist-mono
-          text-ghost-white
-          text-[clamp(0.3rem,2.5vw,0.725rem)]
-          uppercase
-          w-full
-          gap-[clamp(0.55rem,0.8vw,1.5rem)]
-          pt-16
-          md:pt-48
-          px-2
-          md:px-4
-        "
-      >
-        <div
-          className="
-            flex
-            flex-row
-            md:contents
-            justify-between
-            w-full
-            md:w-auto
-          "
-        >
-          <div
-            className="
-              flex
-              flex-col
-              md:flex-row
-              space-y-0
-              space-x-[clamp(0.5rem,4.5vw,6rem)]
-            "
-          >
-            <p>BASED IN ADELAIDE</p>
-
-            <p>
-              ARCHITECTURE / CONSTRUCTION / MEDIA
-            </p>
-          </div>
-
-          <div
-            className="
-              flex
-              flex-col
-              md:flex-row
-              space-y-0
-              space-x-[clamp(0.5rem,4.5vw,6rem)]
-            "
-          >
-            <BlurFlicker>
-              <a
-                href="mailto:info@cloudhaus.com.au"
-                className="hover:opacity-60 transition-opacity duration-300"
-              >
-                GET IN TOUCH
-              </a>
-            </BlurFlicker>
-
-            <BlurFlicker>
-              <a
-                href="https://www.withzane.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold hover:opacity-60 transition-opacity duration-300"
-              >
-                WEBSITE BY: ZANE
-              </a>
-            </BlurFlicker>
-          </div>
-        </div>
-
-        {/* BACK TO HOME */}
-
-        <div
-          className="
-            flex
-            flex-row
-            space-x-[clamp(0.5rem,4.5vw,6rem)]
-          "
-        >
-          <BlurFlicker>
-            <TransitionLink
-              href="/"
-              className="font-bold"
-            >
-              BACK TO HOME
-            </TransitionLink>
-          </BlurFlicker>
-        </div>
-      </footer>
+      <BottomContent noHorizontalPadding noBottomPadding/>
     </div>
   )
 }

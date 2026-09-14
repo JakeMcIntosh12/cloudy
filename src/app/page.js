@@ -1,4 +1,5 @@
 'use client'
+
 import React, { useEffect } from 'react'
 import Lenis from 'lenis'
 import Hero from './Hero/Home'
@@ -7,13 +8,16 @@ import More from './More/page'
 export default function Page() {
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 1.4,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      duration: 1.05,
+      easing: (t) =>
+        1 - Math.pow(1 - t, 4),
       smoothWheel: true,
-      touchMultiplier: 2,
+      smoothTouch: false,
+      touchMultiplier: 1.5,
+      wheelMultiplier: 0.9,
     })
 
-    // expose so GlobalCinematicFog can read the real scroll value
+    // Expose Lenis so GlobalCinematicFog can read the real scroll value
     window.__lenis = lenis
 
     let frameId
@@ -25,7 +29,6 @@ export default function Page() {
 
     frameId = requestAnimationFrame(raf)
 
-    // Cleanup when component unmounts
     return () => {
       cancelAnimationFrame(frameId)
       lenis.destroy()
@@ -37,7 +40,6 @@ export default function Page() {
     <div>
       <Hero />
       <More />
-      
     </div>
   )
 }

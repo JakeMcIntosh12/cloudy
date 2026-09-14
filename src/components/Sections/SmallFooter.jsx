@@ -1,4 +1,3 @@
-
 'use client'
 
 import React, { useRef } from 'react'
@@ -10,7 +9,10 @@ import { useGSAP } from '@gsap/react'
 
 gsap.registerPlugin(ScrollTrigger)
 
-export default function BottomContent() {
+export default function BottomContent({
+  noHorizontalPadding = false,
+  noBottomPadding = false,
+}) {
   const bottomContentRef = useRef(null)
 
   useGSAP(
@@ -52,7 +54,7 @@ export default function BottomContent() {
   return (
     <div
       ref={bottomContentRef}
-      className="
+      className={`
         flex
         flex-col-reverse
         md:flex-row
@@ -67,11 +69,9 @@ export default function BottomContent() {
         gap-[clamp(0.45rem,0.8vw,1.5rem)]
         pt-14
         md:pt-28
-        px-4
-        pb-4
-        md:pb-4
-        md:px-4
-      "
+        ${noBottomPadding ? 'pb-0 md:pb-0' : 'pb-4 md:pb-4'}
+        ${noHorizontalPadding ? '' : 'px-4 md:px-4'}
+      `}
     >
       <div
         className="
@@ -146,4 +146,3 @@ export default function BottomContent() {
     </div>
   )
 }
-
