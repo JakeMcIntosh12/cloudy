@@ -246,7 +246,7 @@ function ImageReveal() {
     >
       <Image
         ref={imageRef}
-        src="/Images/JAKE.png"
+        src="/Images/jake.png"
         alt="Jake McIntosh, Founder and Director of Cloudhaus"
         fill
         priority

@@ -1825,7 +1825,7 @@ export default function WeddingsSection() {
 
         {/* BOTTOM CONTENT */}
 
-        <BottomContent />
+        <BottomContent noHorizontalPadding/>
 
       </div>
     </>
