@@ -638,7 +638,7 @@ export default function Page() {
               >
                 <BlurFlicker>
                   <a
-                    href="https://www.instagram.com/cloudhausmedia/?utm_source=ig_web_button_share_sheet"
+                    href="https://www.instagram.com/itsjmvisuals?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw=="
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:opacity-60 transition-opacity duration-300"
