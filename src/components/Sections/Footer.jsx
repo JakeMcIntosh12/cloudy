@@ -213,7 +213,7 @@ function Footer() {
   return (
     <footer
       id="footer"
-      className="w-full min-h-fit md:min-h-screen flex flex-col justify-between pt-16 lg:pt-32 pb-0 lg:pb-0 space-y-30 md:space-y-60 px-0 md:px-2 bg-black"
+      className="w-full min-h-fit md:min-h-screen flex flex-col justify-between pt-16 lg:pt-32 pb-0 lg:pb-2 space-y-30 md:space-y-60 px-0 md:px-2 bg-black"
     >
       {/* =====================================================
           TOP DIV HOUSING ALL THREE COLUMNS
