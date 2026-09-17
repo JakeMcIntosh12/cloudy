@@ -177,7 +177,7 @@ export default function RootLayout({ children }) {
           {children}
 
           <Analytics />
-          <CloudhausAtmosphere />
+        
         </div>
       </body>
     </html>
