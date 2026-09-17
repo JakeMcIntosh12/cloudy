@@ -11,7 +11,9 @@ import ClientFogWrapper from "@/components/react-three/ClientFogWrapper";
 import TransitionOverlay from "@/components/PageTransitions/TransitionOverlay";
 import FilmGrain from "@/components/react-three/FilmGrain";
 
+
 import { Analytics } from "@vercel/analytics/next";
+import CloudhausAtmosphere from "@/components/react-three/CloudhausAtmosphere";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -175,6 +177,7 @@ export default function RootLayout({ children }) {
           {children}
 
           <Analytics />
+          <CloudhausAtmosphere />
         </div>
       </body>
     </html>
