@@ -39,7 +39,7 @@ export default function ExtrudedElevationReveal({
         split.lines,
         {
           color: "rgb(30, 30, 34)",
-          y: 40,
+          y: 80,
           filter: "blur(8px)",
         },
         {
