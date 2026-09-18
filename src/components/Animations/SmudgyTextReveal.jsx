@@ -38,8 +38,8 @@ export default function ExtrudedElevationReveal({
       tl.fromTo(
         split.lines,
         {
-          color: "rgb(30, 30, 34)",
-          y: 80,
+          color: "rgb(18, 18, 22)",
+          y: 30,
           filter: "blur(8px)",
         },
         {
@@ -48,7 +48,7 @@ export default function ExtrudedElevationReveal({
           filter: "blur(0px)",
           stagger: 0.12,
           ease: "power1.inOut",
-        }
+        },
       );
     }, containerRef);
 
