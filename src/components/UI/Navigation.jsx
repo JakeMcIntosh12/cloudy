@@ -544,7 +544,7 @@ function Navigation({
             <div className="flex flex-row w-full items-center gap-4 text-[clamp(0.8rem,0.65vw+0.3rem,1.25rem)] font-mono tracking-tight uppercase">
               <Link
                 className="hover:text-zinc-700"
-                href="https://instagram.com/itsjmvisuals"
+                href="https://www.instagram.com/cloudhaus_media?stkn=MW50NzF3bnJOaWNiaw=="
                 target="_blank"
                 rel="noopener noreferrer"
               >

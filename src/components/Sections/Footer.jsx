@@ -391,7 +391,7 @@ function Footer() {
               <div className="flex flex-col items-start justify-start w-full space-y-0.5 font-sans font-medium text-ghost-white text-[clamp(0.625rem,4.5vw,1.025rem)] uppercase">
                 <BlurFlicker>
                   <a
-                    href="https://www.instagram.com/itsjmvisuals?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw=="
+                    href="https://www.instagram.com/cloudhaus_media?stkn=MW50NzF3bnJOaWNiaw=="
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:opacity-70 transition-opacity"
