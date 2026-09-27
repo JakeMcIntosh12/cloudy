@@ -107,7 +107,7 @@ export default function SmudgyTitleReveal({
       <Tag
         className={`w-full flex flex-wrap gap-x-[0.25em] ${
           className ||
-          "font-medium  text-[clamp(1rem,1.3vw,1.55rem)] text-ghost-white"
+          "font-medium  text-[clamp(1rem,1.3vw,1.35rem)] text-ghost-white"
         }`}
       >
         {words.map((word, wordIdx) => (
