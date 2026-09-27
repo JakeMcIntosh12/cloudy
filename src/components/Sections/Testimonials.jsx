@@ -339,7 +339,7 @@ function Testimonials() {
                     key={idx}
                     ref={isActive ? quoteRef : null}
                     aria-hidden={!isActive}
-                    className={` col-start-1 row-start-1 w-full text-[clamp(1.35rem,3vw,2rem)] lg:text-[clamp(1.5rem,2.4vw,3.5rem)] text-ghost-white leading-[135%] lg:leading-[130%] text-left font-sans will-change-[transform,opacity,filter] uppercase ${isActive ? 'pointer-events-auto opacity-100 relative' : 'pointer-events-none opacity-0 absolute invisible'} `}
+                    className={` col-start-1 row-start-1 w-full text-[clamp(1.35rem,3vw,2rem)] lg:text-[clamp(1.5rem,2.4vw,3.5rem)] text-ghost-white leading-[140%] lg:leading-[140%] text-left font-sans will-change-[transform,opacity,filter] uppercase ${isActive ? 'pointer-events-auto opacity-100 relative' : 'pointer-events-none opacity-0 absolute invisible'} `}
                   >
                     &quot;{item.quote}&quot;
                   </p>
