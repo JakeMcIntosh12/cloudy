@@ -17,7 +17,7 @@ export default function Template({ children }) {
       })
       .to(overlay, {
         opacity: 0,
-        duration: 0.65,
+        duration: 0.66,
         ease: "power2.out",
         onComplete: () => {
           gsap.set(overlay, { "--wipe": "0%", opacity: 0 });
