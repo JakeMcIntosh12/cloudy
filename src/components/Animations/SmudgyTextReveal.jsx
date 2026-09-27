@@ -71,7 +71,7 @@ export default function ExtrudedElevationReveal({
         ref={textRef}
         className="
           w-full
-          leading-[105%]
+          leading-[120%]
           font-medium
           text-[1.8rem]
           sm:text-[1.75rem]
