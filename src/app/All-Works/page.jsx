@@ -1282,13 +1282,13 @@ function WorkCard({
         {/* CORNERS */}
 
         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
-          <div className="corner-tl absolute top-4 left-4 w-8 h-8 border-t border-l border-white opacity-0 scale-90 -translate-x-3 -translate-y-3 mix-blend-difference" />
+          <div className="corner-tl absolute top-4 left-4 w-4 h-4 border-t border-l border-white opacity-0 scale-90 -translate-x-3 -translate-y-3 mix-blend-difference" />
 
-          <div className="corner-tr absolute top-4 right-4 w-8 h-8 border-t border-r border-white opacity-0 scale-90 translate-x-3 -translate-y-3 mix-blend-difference" />
+          <div className="corner-tr absolute top-4 right-4 w-4 h-4 border-t border-r border-white opacity-0 scale-90 translate-x-3 -translate-y-3 mix-blend-difference" />
 
-          <div className="corner-bl absolute bottom-4 left-4 w-8 h-8 border-b border-l border-white opacity-0 scale-90 -translate-x-3 translate-y-3 mix-blend-difference" />
+          <div className="corner-bl absolute bottom-4 left-4 w-4 h-4 border-b border-l border-white opacity-0 scale-90 -translate-x-3 translate-y-3 mix-blend-difference" />
 
-          <div className="corner-br absolute bottom-4 right-4 w-8 h-8 border-b border-r border-white opacity-0 scale-90 translate-x-3 translate-y-3 mix-blend-difference" />
+          <div className="corner-br absolute bottom-4 right-4 w-4 h-4 border-b border-r border-white opacity-0 scale-90 translate-x-3 translate-y-3 mix-blend-difference" />
         </div>
       </div>
 
